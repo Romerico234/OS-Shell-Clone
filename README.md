@@ -1,5 +1,5 @@
 # Project 2: OS-Shell-Clone
 
-Developers:
+Team Memberes:
 - Romerico David
 - Landon Pasana
