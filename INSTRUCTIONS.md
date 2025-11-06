@@ -1,23 +1,42 @@
 # Build & Run Instructions
 
 ## Requirements
-- GNU Make
-- g++ (C++ compiler)
+- Docker Desktop 
 
-## Build the Shell
+## Build the Docker Image
 
 From the project root, run:
 
 ```bash
-make
+docker compose build
 ```
 
-## Run the Shell
+## Run the Container
 ```bash
-./bin/myshell
+docker compose up -d
 ```
 
-## Rebuild and Run
+## Open up a Shell in the Container
 ```bash
-make && ./bin/myshell
+docker exec -it custom-shell-container bash
+
+# Can check Ubuntu Image
+cat /etc/os-release
+```
+
+## Run Custom Shell
+```bash
+./bin/custom-shell
+```
+
+## Rebuild & Rerun Custom Shell Inside Container
+```bash
+make clean && make
+./bin/shell
+```
+
+## Exit CLI and Stop Container
+```bash
+exit 
+docker compose down
 ```

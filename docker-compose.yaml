@@ -1,0 +1,10 @@
+services:
+  os-shell:
+    build: .
+    container_name: custom-shell-container
+    working_dir: /app
+    stdin_open: true   
+    tty: true          
+    volumes:
+      - .:/app         
+    command: /bin/bash # Again, can change to /bin/custom-shell

@@ -1,7 +1,7 @@
 CXX := g++
 CXXFLAGS := -Wall -Wextra -std=c++17 -Iinclude
 SRC := $(wildcard src/*.cpp)
-BIN := bin/myshell
+BIN := bin/custom-shell
 
 all: $(BIN)
 
