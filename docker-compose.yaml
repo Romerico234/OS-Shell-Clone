@@ -7,4 +7,4 @@ services:
     tty: true          
     volumes:
       - .:/app         
-    command: /bin/bash # Again, can change to /bin/custom-shell
+    command: /bin/bash

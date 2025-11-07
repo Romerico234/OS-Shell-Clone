@@ -10,5 +10,4 @@ COPY . .
 
 RUN make all
 
-# Could be CMD ["./bin/custom-shell"] to run our custom shell immediately
 CMD ["/bin/bash"]
