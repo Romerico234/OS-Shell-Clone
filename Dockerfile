@@ -4,10 +4,8 @@ RUN apt-get update && \
     apt-get install -y build-essential g++ make && \
     apt-get clean
 
-WORKDIR /app
+WORKDIR /OS-Shell-Clone
 
 COPY . .
 
 RUN make all
-
-CMD ["/bin/bash"]

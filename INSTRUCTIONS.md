@@ -20,7 +20,7 @@ docker compose up -d
 ```bash
 docker exec -it custom-shell-container bash
 
-# Can check Ubuntu Image
+# Can check Ubuntu image
 cat /etc/os-release
 ```
 
@@ -32,7 +32,7 @@ cat /etc/os-release
 ## Rebuild & Rerun Custom Shell Inside Container
 ```bash
 make clean && make
-./bin/shell
+./bin/custom-shell
 ```
 
 ## Exit CLI and Stop Container

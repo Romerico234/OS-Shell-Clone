@@ -2,9 +2,7 @@ services:
   os-shell:
     build: .
     container_name: custom-shell-container
-    working_dir: /app
     stdin_open: true   
-    tty: true          
+    tty: true
     volumes:
-      - .:/app         
-    command: /bin/bash
+      - .:/OS-Shell-Clone                 
