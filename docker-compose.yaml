@@ -1,0 +1,8 @@
+services:
+  os-shell:
+    build: .
+    container_name: custom-shell-container
+    stdin_open: true   
+    tty: true
+    volumes:
+      - .:/OS-Shell-Clone                 
