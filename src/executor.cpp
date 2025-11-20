@@ -37,9 +37,9 @@ int Executor::execute(const AST& node) {
 
 int Executor::runCommand(const AST& node) {
     if (node.command == "echo") {
-        return Commands::cmd_echo(node.args);
+        return Commands::echo(node.args);
     } else if (node.command == "pwd") {
-        return Commands::cmd_pwd(node.args);
+        return Commands::pwd(node.args);
     } else {
         std::cerr << "Unknown command: " << node.command << "\n";
         return -1;

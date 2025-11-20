@@ -6,6 +6,6 @@ class Commands {
 public:
     Commands() = delete;
 
-    static int cmd_echo(const std::vector<std::string>& args);
-    static int cmd_pwd(const std::vector<std::string>& args);
+    static int echo(const std::vector<std::string>& args);
+    static int pwd(const std::vector<std::string>& args);
 };
