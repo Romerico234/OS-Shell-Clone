@@ -16,7 +16,7 @@ static const OpMap OP_TABLE = {
     {"&",  TokenType::AMPERSAND}
 };
 
-void Lexer::flush_current(std::vector<Token>& tokens, std::string& current) {
+void Lexer::flushCurrent(std::vector<Token>& tokens, std::string& current) {
     if (!current.empty()) {
         tokens.push_back({TokenType::WORD, current});
         current.clear();
@@ -34,7 +34,7 @@ std::vector<Token> Lexer::tokenize(const std::string& input) {
         char c = input[i];
 
         if (std::isspace(static_cast<unsigned char>(c))) { // whitespace
-            flush_current(tokens, current);
+            flushCurrent(tokens, current);
             ++i;
         } else if (c == '"' || c == '\'') { // quotes
             char quote = c;
@@ -50,7 +50,7 @@ std::vector<Token> Lexer::tokenize(const std::string& input) {
                 ++i; // skip closing quote
             }
 
-            flush_current(tokens, current);
+            flushCurrent(tokens, current);
             tokens.push_back({TokenType::QUOTED, quoted});
         } else if (i + 1 < n) { // possible multi-char op
             std::string two = input.substr(i, 2);
@@ -58,7 +58,7 @@ std::vector<Token> Lexer::tokenize(const std::string& input) {
             OpIter multiOpIter = OP_TABLE.find(two);
 
             if (multiOpIter != OP_TABLE.end()) { // matched multi-char op
-                flush_current(tokens, current);
+                flushCurrent(tokens, current);
                 tokens.push_back({multiOpIter->second, two});
                 i += 2;
             } else {
@@ -67,7 +67,7 @@ std::vector<Token> Lexer::tokenize(const std::string& input) {
                 OpIter iter = OP_TABLE.find(one);
 
                 if (iter != OP_TABLE.end()) { // check single-char op 
-                    flush_current(tokens, current);
+                    flushCurrent(tokens, current);
                     tokens.push_back({iter->second, one});
                     ++i;
                 } else { // normal word token
@@ -81,6 +81,6 @@ std::vector<Token> Lexer::tokenize(const std::string& input) {
         }
     }
 
-    flush_current(tokens, current);
+    flushCurrent(tokens, current);
     return tokens;
 }

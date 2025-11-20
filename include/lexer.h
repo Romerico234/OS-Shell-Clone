@@ -10,5 +10,5 @@ public:
     static std::vector<Token> tokenize(const std::string& input);
 
 private:
-    static void flush_current(std::vector<Token>& tokens, std::string& current);
+    static void flushCurrent(std::vector<Token>& tokens, std::string& current);
 };

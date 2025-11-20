@@ -5,40 +5,20 @@
 #include "parser.h"
 #include "ast.h"
 #include "token.h"
+#include "executor.h"
 
 int main() {
+    std::cout << "|  Welcome to our Custom Shell!\n";
+    std::cout << "|  Type help for our list of commands!\n";
+
     while (true) {
-        std::cout << R"(
-Testing Custom Shell. Enter any of the following commands or -1 to quit:
-- cd
-- rmdir
-- touch
-- cp
-- chown
-- ls / dir
-- echo
-- grep
-- help
-- pause
-- pwd
-- mkdir
-- rm
-- mv
-- chmod
-- cat
-- wc
-- environ
-- clr
-- quit
-)" << std::endl;
 
-        std::cout << "Enter command: ";
-
+        std::cout << "custom-shell> ";
         std::string input;
         std::getline(std::cin, input);
 
-        if (input == "-1") {
-            std::cout << "Exiting shell..." << std::endl;
+        if (input == "-1") { // Eventually changed to quit/exit command
+            std::cout << "Exiting MyShell...\n";
             break;
         }
 
@@ -49,18 +29,14 @@ Testing Custom Shell. Enter any of the following commands or -1 to quit:
         try {
             std::vector<Token> tokens = Lexer::tokenize(input);
 
-            std::cout << "\nTokens:\n";
-            for (const Token& t : tokens) {
-                std::cout << "  [" << t.lexeme << "]\n";
-            }
-
             AST ast = Parser::parse(tokens);
 
-            std::cout << "\nAST:\n";
-            ast.print(std::cout); 
+            Executor::executeCommand(ast);
+
+            std::cout << "\n";
 
         } catch (const std::exception& ex) {
-            std::cerr << "Parse error: " << ex.what() << "\n";
+            std::cerr << "Error: " << ex.what() << "\n\n";
         }
     }
 
