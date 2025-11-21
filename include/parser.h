@@ -34,9 +34,9 @@ public:
     static AST parse(const std::vector<Token>& tokens);
 
 private:
-    static AST parse_command_line(int& index, const std::vector<Token>& tokens);
-    static AST parse_op_expression(AST lhs, int min_prec, int& index, const std::vector<Token>& tokens);
-    static AST parse_command_atomic(int& index, const std::vector<Token>& tokens);
-    static bool is_operator(const Token& tok);
+    static AST parseCmdLine(int& index, const std::vector<Token>& tokens);
+    static AST parseOpExpr(AST lhs, int min_prec, int& index, const std::vector<Token>& tokens);
+    static AST parseCmdAtomic(int& index, const std::vector<Token>& tokens);
+    static bool isOperator(const Token& tok);
     static int precedence(const std::string& op);
 };

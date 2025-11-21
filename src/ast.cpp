@@ -1,6 +1,6 @@
 #include "ast.h"
 
-AST AST::make_command_node(std::string cmd, std::vector<std::string> arguments) {
+AST AST::makeCommandNode(std::string cmd, std::vector<std::string> arguments) {
     AST node;
     node.node = NodeType::Command;
     node.command = std::move(cmd);
@@ -8,7 +8,7 @@ AST AST::make_command_node(std::string cmd, std::vector<std::string> arguments) 
     return node;
 }
 
-AST AST::make_binary_node(const std::string& binOp, AST lhs, AST rhs) {
+AST AST::makeBinaryNode(const std::string& binOp, AST lhs, AST rhs) {
     AST node;
     node.node = NodeType::BinaryOp;
     node.binOp = binOp;
