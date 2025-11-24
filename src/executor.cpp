@@ -36,10 +36,18 @@ int Executor::execute(const AST& node) {
 }
 
 int Executor::runCommand(const AST& node) {
-    if (node.command == "echo") {
+    if (node.command == "help") {
+        return Commands::help(node.args);
+    } else if (node.command == "echo") {
         return Commands::echo(node.args);
-    } else if (node.command == "pwd") {
-        return Commands::pwd(node.args);
+    } else if (node.command == "pause") {
+        return Commands::pause(node.args);
+    } else if (node.command == "ls") {
+        return Commands::ls(node.args);
+    } else if (node.command == "dir") {
+        return Commands::dir(node.args);
+    } else if (node.command == "cd") {
+        return Commands::cd(node.args);
     } else {
         std::cerr << "Unknown command: " << node.command << "\n";
         return -1;
