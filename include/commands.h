@@ -8,4 +8,5 @@ public:
 
     static int echo(const std::vector<std::string>& args);
     static int pwd(const std::vector<std::string>& args);
+    static int quit(const std::vector<std::string>& args);
 };

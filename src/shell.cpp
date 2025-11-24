@@ -17,10 +17,6 @@ int main() {
         std::string input;
         std::getline(std::cin, input);
 
-        if (input == "-1") { // Eventually changed to quit/exit command
-            std::cout << "Exiting MyShell...\n";
-            break;
-        }
 
         if (input.empty()) {
             continue;
