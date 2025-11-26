@@ -8,10 +8,10 @@ AST AST::makeCommandNode(std::string cmd, std::vector<std::string> arguments) {
     return node;
 }
 
-AST AST::makeBinaryNode(const std::string& binOp, AST lhs, AST rhs) {
+AST AST::makeOperatorNode(const std::string& op, AST lhs, AST rhs) {
     AST node;
-    node.node = NodeType::BinaryOp;
-    node.binOp = binOp;
+    node.node = NodeType::Operator;
+    node.op = op;
     node.left = std::make_unique<AST>(std::move(lhs));
     node.right = std::make_unique<AST>(std::move(rhs));
     return node;
@@ -32,8 +32,8 @@ void AST::print(std::ostream& os, int indentLvl) {
             os << " [" << a << "]";
         }
         os << "\n";
-    } else if (node == NodeType::BinaryOp) {
-        os << "BinaryOp: '" << binOp << "'\n";
+    } else if (node == NodeType::Operator) {
+        os << "Operator: '" << op << "'\n";
         if (left)  {
             left->print(os, indentLvl + 1);
         }
