@@ -8,6 +8,11 @@
 #include <string.h>
 #include <iostream>
 
+/**
+ * @brief Display a list of all supported shell commands
+ * @param args Must be empty
+ * @return Status code and a help message on success
+ */
 CommandResult Commands::help(const std::vector<std::string>& args) {
     if (!args.empty()) {
         return {1, "", "help: this command takes no arguments"};
@@ -40,6 +45,11 @@ CommandResult Commands::help(const std::vector<std::string>& args) {
     return {0, out, ""};
 }
 
+/**
+ * @brief Print all provided arguments separated by single spaces
+ * @param args A vector of strings to print
+ * @return Status code and the formatted output text
+ */
 CommandResult Commands::echo(const std::vector<std::string>& args) {
     std::string out;
 
@@ -50,6 +60,11 @@ CommandResult Commands::echo(const std::vector<std::string>& args) {
     return {0, out, ""};
 }
 
+/**
+ * @brief Pause execution of process
+ * @param args Must be empty
+ * @return Status code, empty output on success or error message on failure
+ */
 CommandResult Commands::pause(const std::vector<std::string> &args)
 {
     if (!args.empty()){
@@ -60,6 +75,14 @@ CommandResult Commands::pause(const std::vector<std::string> &args)
     return {0, "", ""};
 }
 
+/**
+ * @brief List the contents of the current working directory
+ * @param args Optional flags:
+ *        - "-a" include hidden entries
+ *        - "-A" exclude "." and ".."
+ *        - "-l" include detailed file information (permissions, access rights)
+ * @return Status code, directory listing output, and possible error messages
+ */
 CommandResult Commands::ls(const std::vector<std::string>& args) {
     bool showAll = false;
     bool almostAll = false; 
@@ -90,13 +113,10 @@ CommandResult Commands::ls(const std::vector<std::string>& args) {
     while ((dp = readdir(dirp)) != nullptr) {
         std::string name = dp->d_name;
 
-        // Hide dotfiles unless -a or -A
         if (!showAll && !almostAll && name[0] == '.') continue;
 
-        // -A hides only . and ..
         if (almostAll && (name == "." || name == "..")) continue;
 
-        // Long listing
         if (longList) {
             struct stat info;
             if (stat(name.c_str(), &info) == -1) {
@@ -129,11 +149,44 @@ CommandResult Commands::ls(const std::vector<std::string>& args) {
     return {0, out, err};
 }
 
-// Alias for `ls`
+/**
+ * @brief Alias for ls command
+ * @param args Refer to ls command
+ * @return Status code, directory listing output, and possible error messages
+ */
 CommandResult Commands::dir(const std::vector<std::string>& args) {
     return ls(args);
 }
 
+/**
+ * @brief Change the current working directory
+ * @param args
+ *        - zero arguments: go to the home directory
+ *        - one argument: change to the specified path (supports ~ expansion)
+ * @return Status code, empty output on success or error message on failure
+ */
 CommandResult Commands::cd(const std::vector<std::string>& args) {
+    const char* home = getenv("HOME");
+
+    if (args.empty()){
+        if(chdir(home) == -1) {
+            return {1, "", "cd: failed to change directory"};
+        };
+    } else if (args.size() == 1) {
+        std::string path = args[0];
+
+        if (path[0] == '~') {
+            path = std::string(home) + path.substr(1);
+        } 
+
+        if(chdir(path.c_str()) == -1) {
+            std::string errorMsg = "cd: failed to change directory: " + path;
+            return {1, "", errorMsg};
+        };
+
+    } else {
+        return {1, "", "cd: too many arguments"};
+    }
+
     return {0, "", ""};
 }

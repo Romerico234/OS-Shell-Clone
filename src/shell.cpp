@@ -7,14 +7,18 @@
 #include "token.h"
 #include "executor.h"
 #include "commands.h"
+#include <limits.h>
+#include <unistd.h>
 
 int main() {
     std::cout << "|  Welcome to our Custom Shell!\n";
     std::cout << "|  Type help for our list of commands!\n";
 
     while (true) {
+        char cwd[PATH_MAX];
+        getcwd(cwd, sizeof(cwd));
+        std::cout << cwd << "/custom-shell> ";
 
-        std::cout << "custom-shell> ";
         std::string input;
         std::getline(std::cin, input);
 
@@ -29,11 +33,11 @@ int main() {
 
             CommandResult result = Executor::executeCommand(ast);
 
-            if (!result.output.empty()) {
+            if (result.status == 0) {
                 std::cout << result.output;
             }
 
-            if (!result.error.empty()) {
+            if (result.status == 1) {
                 std::cerr << result.error;
             }
 
