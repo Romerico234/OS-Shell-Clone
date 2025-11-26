@@ -42,6 +42,8 @@ int Executor::runCommand(const AST& node) {
         return Commands::pwd(node.args);
         } else if (node.command == "quit") {   
         return Commands::quit(node.args);
+    } else if (node.command == "clr") {
+        return Commands::clr(node.args);
     } else {
         std::cerr << "Unknown command: " << node.command << "\n";
         return -1;
