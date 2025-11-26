@@ -6,6 +6,7 @@
 #include "ast.h"
 #include "token.h"
 #include "executor.h"
+#include "commands.h"
 
 int main() {
     std::cout << "|  Welcome to our Custom Shell!\n";
@@ -17,11 +18,6 @@ int main() {
         std::string input;
         std::getline(std::cin, input);
 
-        if (input == "-1") { // Eventually changed to quit/exit command
-            std::cout << "Exiting MyShell...\n";
-            break;
-        }
-
         if (input.empty()) {
             continue;
         }
@@ -31,12 +27,20 @@ int main() {
 
             AST ast = Parser::parse(tokens);
 
-            Executor::executeCommand(ast);
+            CommandResult result = Executor::executeCommand(ast);
+
+            if (!result.output.empty()) {
+                std::cout << result.output;
+            }
+
+            if (!result.error.empty()) {
+                std::cerr << result.error;
+            }
 
             std::cout << "\n";
 
         } catch (const std::exception& ex) {
-            std::cerr << "Error: " << ex.what() << "\n\n";
+            std::cerr << "Error: " << ex.what() << "\n";
         }
     }
 

@@ -1,104 +1,139 @@
 #include "commands.h"
-#include <iostream>
 #include <limits>
 #include <string>
 #include <dirent.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <string.h>
+#include <iostream>
 
-int Commands::help(const std::vector<std::string>& args) {
-    std::cout <<
-    "Available Commands:\n\n"
-    "  cd [dir]              Change directory. If no argument is given, prints the current directory.\n"
-    "\n"
-    "  clr                   Clear the screen.\n"
-    "\n"
-    "  dir [path]            List files and subdirectories in the given directory.\n"
-    "                        Defaults to the current directory.\n"
-    "\n"
-    "  environ               Display all environment variables.\n"
-    "\n"
-    "  echo [text]           Print text to standard output.\n"
-    "                        Multiple spaces/tabs are collapsed.\n"
-    "\n"
-    "  help                  Display this help manual.\n"
-    "\n"
-    "  pause                 Pause shell execution until Enter is pressed.\n"
-    "\n"
-    "  quit                  Exit the shell.\n"
-    "\n"
-    "  chmod <mode> <file>   Change file permissions (e.g., chmod 755 file.txt).\n"
-    "\n"
-    "  chown <owner>[:group] <file>\n"
-    "                        Change file ownership.\n"
-    "\n"
-    "  ls [-a] [-l] [path]   List directory contents.\n"
-    "                        -a : show hidden files\n"
-    "                        -l : long listing format\n"
-    "\n"
-    "  dir [-a] [-l] [path]   List directory contents.\n"
-    "                        -a : show hidden files\n"
-    "                        -l : long listing format\n"
-    "\n"
-    "  pwd                   Print the current working directory.\n"
-    "\n"
-    "  cat <file...>         Display the contents of one or more files.\n"
-    "\n"
-    "  mkdir <dir...>        Create one or more directories.\n"
-    "\n"
-    "  rmdir <dir...>        Remove empty directories.\n"
-    "\n"
-    "  rm [-r] [-f] <path>   Delete files or directories.\n"
-    "                        -r : recursive\n"
-    "                        -f : force\n"
-    "\n"
-    "  cp [-r] <src> <dst>   Copy files or directories.\n"
-    "                        -r : recursive\n"
-    "\n"
-    "  mv <src> <dst>        Move or rename files or directories.\n"
-    "\n"
-    "  touch <file...>       Create empty files or update timestamps.\n"
-    "\n"
-    "  grep [-i] [-n] [-v] <pattern> <file>\n"
-    "                        Search for patterns in files.\n"
-    "                        -i : case-insensitive\n"
-    "                        -n : show line numbers\n"
-    "                        -v : invert match\n"
-    "\n"
-    "  wc [-l] [-w] [-c] <file>\n"
-    "                        Count lines, words, or characters.\n"
-    "                        -l : lines\n"
-    "                        -w : words\n"
-    "                        -c : characters\n"
-    << std::endl;
-    return 0;
-}
-
-int Commands::echo(const std::vector<std::string>& args) {
-    for (const std::string& arg : args) {
-        std::cout << arg << " ";
-    }
-    std::cout << std::endl;
-    return 0;
-}
-
-int Commands::pause(const std::vector<std::string>& args) {
+CommandResult Commands::help(const std::vector<std::string>& args) {
     if (!args.empty()) {
-        std::cerr << "pause: this command takes no arguments" << std::endl;
-        return 1;
+        return {1, "", "help: this command takes no arguments"};
     }
-    
+
+    std::string out =
+        "Available Commands:\n"
+        "  cd [dir]              Change directory.\n"
+        "  clr                   Clear the screen.\n"
+        "  dir [path]            List directory contents.\n"
+        "  environ               Display environment variables.\n"
+        "  echo [text]           Print text.\n"
+        "  help                  Show help.\n"
+        "  pause                 Pause shell.\n"
+        "  quit                  Exit shell.\n"
+        "  chmod <mode> <file>   Change permissions.\n"
+        "  chown <owner> <file>  Change ownership.\n"
+        "  ls [-a] [-A] [-l]     List directory contents.\n"
+        "  pwd                   Print working directory.\n"
+        "  cat <file>            Print file contents.\n"
+        "  mkdir <dir>           Create directory.\n"
+        "  rmdir <dir>           Remove directory.\n"
+        "  rm [-r] [-f] <path>   Remove file or directory.\n"
+        "  cp [-r] <src> <dst>   Copy.\n"
+        "  mv <src> <dst>        Move.\n"
+        "  touch <file>          Create empty file.\n"
+        "  grep <pattern> <file> Search text.\n"
+        "  wc [-l] [-w] [-c]     Count lines/words/chars.";
+
+    return {0, out, ""};
+}
+
+CommandResult Commands::echo(const std::vector<std::string>& args) {
+    std::string out;
+
+    for (const std::string& arg : args) {
+        out += arg + " ";
+    }
+
+    return {0, out, ""};
+}
+
+CommandResult Commands::pause(const std::vector<std::string> &args)
+{
+    if (!args.empty()){
+        return {1, "", "pause: this command takes no arguments"};
+    }
+
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    return 0;
+    return {0, "", ""};
 }
 
-int Commands::ls(const std::vector<std::string>& args) {
-    return 0;
+CommandResult Commands::ls(const std::vector<std::string>& args) {
+    bool showAll = false;
+    bool almostAll = false; 
+    bool longList = false; 
+
+    std::string out;
+    std::string err;
+
+    for (const std::string& arg : args) {
+        if (arg == "-a") showAll = true;
+        else if (arg == "-A") almostAll = true;
+        else if (arg == "-l") longList = true;
+        else return {1, "", "invalid flag -- '" + arg};
+    }
+
+    char cwd[FILENAME_MAX];
+    if (!getcwd(cwd, FILENAME_MAX)) {
+        return {1, "", "failed to get current directory"};
+    }
+
+    DIR* dirp = opendir(cwd);
+    if (!dirp) {
+        return {1, "", "cannot open directory: " + std::string(strerror(errno))};
+    }
+
+    struct dirent* dp;
+
+    while ((dp = readdir(dirp)) != nullptr) {
+        std::string name = dp->d_name;
+
+        // Hide dotfiles unless -a or -A
+        if (!showAll && !almostAll && name[0] == '.') continue;
+
+        // -A hides only . and ..
+        if (almostAll && (name == "." || name == "..")) continue;
+
+        // Long listing
+        if (longList) {
+            struct stat info;
+            if (stat(name.c_str(), &info) == -1) {
+                err += "cannot access " + name + ": " + strerror(errno);
+                continue;
+            }
+
+            char type = S_ISDIR(info.st_mode) ? 'd' : '-';
+
+            out += type;
+            out += ((info.st_mode & S_IRUSR) ? 'r' : '-');
+            out += ((info.st_mode & S_IWUSR) ? 'w' : '-');
+            out += ((info.st_mode & S_IXUSR) ? 'x' : '-');
+            out += ((info.st_mode & S_IRGRP) ? 'r' : '-');
+            out += ((info.st_mode & S_IWGRP) ? 'w' : '-');
+            out += ((info.st_mode & S_IXGRP) ? 'x' : '-');
+            out += ((info.st_mode & S_IROTH) ? 'r' : '-');
+            out += ((info.st_mode & S_IWOTH) ? 'w' : '-');
+            out += ((info.st_mode & S_IXOTH) ? 'x' : '-');
+            out += " " + std::to_string(info.st_size);
+            out += " " + name + "\n";
+
+            continue;
+        }
+
+        out += name + " ";
+    }
+
+    closedir(dirp);
+    return {0, out, err};
 }
 
-int Commands::dir(const std::vector<std::string>& args) {
-    return 0;
+// Alias for `ls`
+CommandResult Commands::dir(const std::vector<std::string>& args) {
+    return ls(args);
 }
 
-int Commands::cd(const std::vector<std::string>& args) {
-    return 0;
+CommandResult Commands::cd(const std::vector<std::string>& args) {
+    return {0, "", ""};
 }

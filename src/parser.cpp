@@ -75,7 +75,7 @@ AST Parser::parseOpExpr(AST lhs, int min_prec, int& index, const std::vector<Tok
             }
         }
 
-        lhs = AST::makeBinaryNode(op, std::move(lhs), std::move(rhs));
+        lhs = AST::makeOperatorNode(op, std::move(lhs), std::move(rhs));
     }
 
     return lhs;
