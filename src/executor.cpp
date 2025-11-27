@@ -25,12 +25,17 @@ CommandResult Executor::execute(const AST& node) {
 }
 
 CommandResult Executor::runCommand(const AST& node) {
-    if (node.command == "help") return Commands::help(node.args);
-    if (node.command == "echo") return Commands::echo(node.args);
-    if (node.command == "pause") return Commands::pause(node.args);
-    if (node.command == "ls")   return Commands::ls(node.args);
-    if (node.command == "dir")  return Commands::dir(node.args);
-    if (node.command == "cd")   return Commands::cd(node.args);
+    if (node.command == "help")  return Commands::helpCommand(node.args);
+    if (node.command == "echo")  return Commands::echoCommand(node.args);
+    if (node.command == "pause") return Commands::pauseCommand(node.args);
+    if (node.command == "ls")    return Commands::lsCommand(node.args);
+    if (node.command == "dir")   return Commands::dirCommand(node.args);
+    if (node.command == "cd")    return Commands::cdCommand(node.args);
+    if (node.command == "rmdir") return Commands::rmdirCommand(node.args);
+    if (node.command == "touch") return Commands::touchCommand(node.args);
+    if (node.command == "cp")    return Commands::cpCommand(node.args);
+    if (node.command == "chown") return Commands::chownCommand(node.args);
+    if (node.command == "grep")  return Commands::grepCommand(node.args);
 
     return {1, "", "Unknown command: " + node.command};
 }
