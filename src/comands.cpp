@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <string.h>
 #include <iostream>
+#include <fcntl.h>
 
 /**
  * @brief Display a list of all supported shell commands
@@ -20,27 +21,27 @@ CommandResult Commands::helpCommand(const std::vector<std::string>& args) {
 
     std::string out =
         "Available Commands:\n"
-        "  cd [dir]              Change directory.\n"
-        "  clr                   Clear the screen.\n"
-        "  dir [path]            List directory contents.\n"
-        "  environ               Display environment variables.\n"
-        "  echo [text]           Print text.\n"
-        "  help                  Show help.\n"
-        "  pause                 Pause shell.\n"
-        "  quit                  Exit shell.\n"
-        "  chmod <mode> <file>   Change permissions.\n"
-        "  chown <owner> <file>  Change ownership.\n"
-        "  ls [-a] [-A] [-l]     List directory contents.\n"
-        "  pwd                   Print working directory.\n"
-        "  cat <file>            Print file contents.\n"
-        "  mkdir <dir>           Create directory.\n"
-        "  rmdir <dir>           Remove directory.\n"
-        "  rm [-r] [-f] <path>   Remove file or directory.\n"
-        "  cp [-r] <src> <dst>   Copy.\n"
-        "  mv <src> <dst>        Move.\n"
-        "  touch <file>          Create empty file.\n"
-        "  grep <pattern> <file> Search text.\n"
-        "  wc [-l] [-w] [-c]     Count lines/words/chars.";
+        "  cd [dir]                       Change directory.\n"
+        "  clr                            Clear the screen.\n"
+        "  dir [-a] [-A] [-l] [path]      List directory contents.\n"
+        "  environ                        Display environment variables.\n"
+        "  echo [text]                    Print text.\n"
+        "  help                           Show help.\n"
+        "  pause                          Pause shell.\n"
+        "  quit                           Exit shell.\n"
+        "  chmod <mode> <file>            Change permissions.\n"
+        "  chown <owner> <file>           Change ownership.\n"
+        "  ls [-a] [-A] [-l] [path]       List directory contents.\n"
+        "  pwd                            Print working directory.\n"
+        "  cat <file>                     Print file contents.\n"
+        "  mkdir <dir>                    Create directory.\n"
+        "  rmdir <dir>                    Remove directory.\n"
+        "  rm [-r] [-f] <path>            Remove file or directory.\n"
+        "  cp [-r] <src> <dst>            Copy.\n"
+        "  mv <src> <dst>                 Move.\n"
+        "  touch <file>                   Create empty file.\n"
+        "  grep <pattern> <file>          Search text.\n"
+        "  wc [-l] [-w] [-c]              Count lines/words/chars.";
 
     return {0, out, ""};
 }
@@ -223,8 +224,6 @@ CommandResult Commands::rmdirCommand(const std::vector<std::string>& args) {
                     return {1, "", formatRmdirErrorMsg(path)};
                 }
 
-                out += "Removed directory: " + path + "\n";
-
                 size_t pos = path.find_last_of('/');
                 if (pos == std::string::npos) break;
 
@@ -234,7 +233,7 @@ CommandResult Commands::rmdirCommand(const std::vector<std::string>& args) {
                 if (path == "" || path == "/") break;
             }
 
-            return {0, out, ""};
+            return {0, "", ""};
         }
         else {
             return {1, "", "rmdir: unrecognized option '" + args[0] + "'"};
@@ -251,15 +250,41 @@ CommandResult Commands::rmdirCommand(const std::vector<std::string>& args) {
         return {1, "", formatRmdirErrorMsg(path)};
     }
 
-    return {0, "Removed directory: " + path, ""};
+    return {0, ""};
 }
 
 /**
- * @brief 
- * @param args
- * @return 
+ * @brief Creates a file if it does not exit or updates an existing file's access/modification times
+ * @param args The file name
+ * @return status code, empty output on success or error message on failure
  */
 CommandResult Commands::touchCommand(const std::vector<std::string>& args) {
+    /**
+     * TODO: Implement optional flags
+     *        - "-a"
+     *        - "-m"
+     *        - "-t"
+     *        - "-c"
+    */
+
+    if (args.empty() || args.size() > 1) {
+        return {1, "", "touch: invalid arguments passed"};
+    }
+
+    std::string fileName = args[0];
+    
+    /**
+     * @note O_CREAT flag creates the file if it does not exist
+     * @note 0644 is the permission bits that allows read and write for the owner, and read-only for group and the public
+    */
+    int fd = open(fileName.c_str(), O_CREAT | O_WRONLY, 0644);
+
+    if (fd == -1) {
+        return {1, "", "touch: cannot create file '" + fileName + "': " + std::string(strerror(errno))};
+    }
+
+    close(fd); 
+
     return {0, "", ""};
 }
 

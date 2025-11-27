@@ -33,16 +33,22 @@ int main() {
 
             CommandResult result = Executor::executeCommand(ast);
 
+            bool hasOutput = false;
+
             if (result.status == 0) {
                 std::cout << result.output;
+                if (!result.output.empty()) hasOutput = true;
             }
 
             if (result.status == 1) {
                 std::cerr << result.error;
+                if (!result.error.empty()) hasOutput = true;
             }
-
-            std::cout << "\n";
-
+            
+            if (hasOutput) {
+                std::cout << "\n";
+            }
+            
         } catch (const std::exception& ex) {
             std::cerr << "Error: " << ex.what() << "\n";
         }
