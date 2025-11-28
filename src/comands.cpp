@@ -37,7 +37,7 @@ CommandResult Commands::helpCommand(const std::vector<std::string>& args) {
         "  mkdir <dir>                    Create directory.\n"
         "  rmdir <dir>                    Remove directory.\n"
         "  rm [-r] [-f] <path>            Remove file or directory.\n"
-        "  cp [-r] <src> <dst>            Copy.\n"
+        "  cp <src>... <dst>              Copy.\n"
         "  mv <src> <dst>                 Move.\n"
         "  touch <file>                   Create empty file.\n"
         "  grep <pattern> <file>          Search text.\n"
@@ -256,7 +256,7 @@ CommandResult Commands::rmdirCommand(const std::vector<std::string>& args) {
 /**
  * @brief Creates a file if it does not exit or updates an existing file's access/modification times
  * @param args The file name
- * @return status code, empty output on success or error message on failure
+ * @return Status code, empty output on success or error message on failure
  */
 CommandResult Commands::touchCommand(const std::vector<std::string>& args) {
     /**
@@ -289,11 +289,81 @@ CommandResult Commands::touchCommand(const std::vector<std::string>& args) {
 }
 
 /**
- * @brief 
- * @param args
- * @return 
+ * @brief Copy a file or directory to a destination path.
+ * @param args Source and destination paths
+ * @return Status code, empty output on success or an error message on failure
  */
 CommandResult Commands::cpCommand(const std::vector<std::string>& args) {
+    /**
+     * TODO: Implement "-r" flag
+    */
+
+    if (args.empty()) {
+        return {1, "", "cp: missing operand"};
+    }
+
+    if (args.size() == 1) {
+        return {1, "", "cp: missing destination file operand after '" + args[0] + "'"};
+    }
+
+    std::string dest = args.back();
+
+    struct stat stDest;
+    bool destIsDir = stat(dest.c_str(), &stDest) == 0 && S_ISDIR(stDest.st_mode);
+
+    // If multiple sources, dest MUST be a directory
+    int numSources = args.size() - 1;
+    if (numSources > 1 && !destIsDir) {
+        return {1, "", "cp: target '" + dest + "' is not a directory"};
+    }
+
+    for (int i = 0; i < numSources; i++) {
+        std::string src = args[i];
+
+        // Rejecting directory sources b/c no -r support yet
+        struct stat stSrc;
+        if (stat(src.c_str(), &stSrc) == 0 && S_ISDIR(stSrc.st_mode)) {
+            return {1, "", "cp: omitting directory '" + src + "'"};
+        }
+
+        std::string finalDest = dest;
+        if (destIsDir) {
+            int pos = src.find_last_of('/'); 
+            std::string filename = (pos == std::string::npos) ? src : src.substr(pos + 1);
+            finalDest = dest + "/" + filename;
+        }
+
+        int fdSrc = open(src.c_str(), O_RDONLY);
+        if (fdSrc == -1) {
+            return {1, "", "cp: cannot open source file '" + src + "': " + std::string(strerror(errno))};
+        }
+
+        int fdDest = open(finalDest.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fdDest == -1) {
+            close(fdSrc);
+            return {1, "", "cp: cannot create destination file '" + finalDest + "': " + std::string(strerror(errno))};
+        }
+
+        char buffer[1024];
+        ssize_t bytesRead;
+        while ((bytesRead = read(fdSrc, buffer, sizeof(buffer))) > 0) {
+            if (write(fdDest, buffer, bytesRead) != bytesRead) {
+                close(fdSrc);
+                close(fdDest);
+                return {1, "", "cp: write error on '" + finalDest + "': " + std::string(strerror(errno))};
+            }
+        }
+
+        if (bytesRead == -1) {
+            close(fdSrc);
+            close(fdDest);
+            return {1, "", "cp: read error on '" + src + "': " + std::string(strerror(errno))};
+        }
+
+        close(fdSrc);
+        close(fdDest);
+    }
+
     return {0, "", ""};
 }
 
