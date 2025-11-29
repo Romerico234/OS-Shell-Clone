@@ -7,6 +7,9 @@
 #include <errno.h>
 #include <string.h>
 #include <iostream>
+#include <fcntl.h>
+#include <pwd.h>
+#include <regex>
 
 /**
  * @brief Display a list of all supported shell commands
@@ -20,27 +23,27 @@ CommandResult Commands::helpCommand(const std::vector<std::string>& args) {
 
     std::string out =
         "Available Commands:\n"
-        "  cd [dir]              Change directory.\n"
-        "  clr                   Clear the screen.\n"
-        "  dir [path]            List directory contents.\n"
-        "  environ               Display environment variables.\n"
-        "  echo [text]           Print text.\n"
-        "  help                  Show help.\n"
-        "  pause                 Pause shell.\n"
-        "  quit                  Exit shell.\n"
-        "  chmod <mode> <file>   Change permissions.\n"
-        "  chown <owner> <file>  Change ownership.\n"
-        "  ls [-a] [-A] [-l]     List directory contents.\n"
-        "  pwd                   Print working directory.\n"
-        "  cat <file>            Print file contents.\n"
-        "  mkdir <dir>           Create directory.\n"
-        "  rmdir <dir>           Remove directory.\n"
-        "  rm [-r] [-f] <path>   Remove file or directory.\n"
-        "  cp [-r] <src> <dst>   Copy.\n"
-        "  mv <src> <dst>        Move.\n"
-        "  touch <file>          Create empty file.\n"
-        "  grep <pattern> <file> Search text.\n"
-        "  wc [-l] [-w] [-c]     Count lines/words/chars.";
+        "  cd [dir]                                 Change directory.\n"
+        "  clr                                      Clear the screen.\n"
+        "  dir [-a] [-A] [-l] [path]                List directory contents.\n"
+        "  environ                                  Display environment variables.\n"
+        "  echo [text]                              Print text.\n"
+        "  help                                     Show help.\n"
+        "  pause                                    Pause shell.\n"
+        "  quit                                     Exit shell.\n"
+        "  chmod <mode> <file>                      Change permissions.\n"
+        "  chown <owner> <file>                     Change ownership.\n"
+        "  ls [-a] [-A] [-l] [path]                 List directory contents.\n"
+        "  pwd                                      Print working directory.\n"
+        "  cat <file>                               Print file contents.\n"
+        "  mkdir <dir>                              Create directory.\n"
+        "  rmdir <dir>                              Remove directory.\n"
+        "  rm [-r] [-f] <path>                      Remove file or directory.\n"
+        "  cp <src>... <dst>                        Copy.\n"
+        "  mv <src> <dst>                           Move.\n"
+        "  touch <file>                             Create empty file.\n"
+        "  grep [OPTIONS] <pattern> <file>          Search text.\n"
+        "  wc [-l] [-w] [-c]                        Count lines/words/chars.";
 
     return {0, out, ""};
 }
@@ -223,8 +226,6 @@ CommandResult Commands::rmdirCommand(const std::vector<std::string>& args) {
                     return {1, "", formatRmdirErrorMsg(path)};
                 }
 
-                out += "Removed directory: " + path + "\n";
-
                 size_t pos = path.find_last_of('/');
                 if (pos == std::string::npos) break;
 
@@ -234,7 +235,7 @@ CommandResult Commands::rmdirCommand(const std::vector<std::string>& args) {
                 if (path == "" || path == "/") break;
             }
 
-            return {0, out, ""};
+            return {0, "", ""};
         }
         else {
             return {1, "", "rmdir: unrecognized option '" + args[0] + "'"};
@@ -251,43 +252,364 @@ CommandResult Commands::rmdirCommand(const std::vector<std::string>& args) {
         return {1, "", formatRmdirErrorMsg(path)};
     }
 
-    return {0, "Removed directory: " + path, ""};
+    return {0, "", ""};
 }
 
 /**
- * @brief 
- * @param args
- * @return 
+ * @brief Creates a file if it does not exit or updates an existing file's access/modification times
+ * @param args The file name
+ * @return Status code, empty output on success or error message on failure
  */
 CommandResult Commands::touchCommand(const std::vector<std::string>& args) {
+    /**
+     * TODO: Implement optional flags
+     *        - "-a"
+     *        - "-m"
+     *        - "-t"
+     *        - "-c"
+    */
+
+    if (args.empty() || args.size() > 1) {
+        return {1, "", "touch: invalid arguments passed"};
+    }
+
+    std::string fileName = args[0];
+    
+    /**
+     * @note O_CREAT flag creates the file if it does not exist
+     * @note 0644 is the permission bits that allows read and write for the owner, and read-only for group and the public
+    */
+    int fd = open(fileName.c_str(), O_CREAT | O_WRONLY, 0644);
+    if (fd == -1) {
+        return {1, "", "touch: cannot create file '" + fileName + "': " + std::string(strerror(errno))};
+    }
+
+    close(fd); 
+
     return {0, "", ""};
 }
 
 /**
- * @brief 
- * @param args
- * @return 
+ * @brief Copy a file or directory to a destination path.
+ * @param args Source and destination paths
+ * @return Status code, empty output on success or an error message on failure
  */
 CommandResult Commands::cpCommand(const std::vector<std::string>& args) {
+    /**
+     * TODO: Implement "-r" flag
+    */
+
+    if (args.empty()) {
+        return {1, "", "cp: missing operand"};
+    }
+
+    if (args.size() == 1) {
+        return {1, "", "cp: missing destination file operand after '" + args[0] + "'"};
+    }
+
+    std::string dest = args.back();
+
+    struct stat stDest;
+    bool destIsDir = stat(dest.c_str(), &stDest) == 0 && S_ISDIR(stDest.st_mode);
+
+    // If multiple sources, dest MUST be a directory
+    int numSources = args.size() - 1;
+    if (numSources > 1 && !destIsDir) {
+        return {1, "", "cp: target '" + dest + "' is not a directory"};
+    }
+
+    for (int i = 0; i < numSources; i++) {
+        std::string src = args[i];
+
+        // Rejecting directory sources b/c no -r support yet
+        struct stat stSrc;
+        if (stat(src.c_str(), &stSrc) == 0 && S_ISDIR(stSrc.st_mode)) {
+            return {1, "", "cp: omitting directory '" + src + "'"};
+        }
+
+        std::string finalDest = dest;
+        if (destIsDir) {
+            ssize_t pos = src.find_last_of('/'); 
+            std::string filename = (pos == std::string::npos) ? src : src.substr(pos + 1);
+            finalDest = dest + "/" + filename;
+        }
+
+        int fdSrc = open(src.c_str(), O_RDONLY);
+        if (fdSrc == -1) {
+            return {1, "", "cp: cannot open source file '" + src + "': " + std::string(strerror(errno))};
+        }
+
+        int fdDest = open(finalDest.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fdDest == -1) {
+            close(fdSrc);
+            return {1, "", "cp: cannot create destination file '" + finalDest + "': " + std::string(strerror(errno))};
+        }
+
+        char buffer[1024];
+        ssize_t bytesRead;
+        while ((bytesRead = read(fdSrc, buffer, sizeof(buffer))) > 0) {
+            if (write(fdDest, buffer, bytesRead) != bytesRead) {
+                close(fdSrc);
+                close(fdDest);
+                return {1, "", "cp: write error on '" + finalDest + "': " + std::string(strerror(errno))};
+            }
+        }
+
+        if (bytesRead == -1) {
+            close(fdSrc);
+            close(fdDest);
+            return {1, "", "cp: read error on '" + src + "': " + std::string(strerror(errno))};
+        }
+
+        close(fdSrc);
+        close(fdDest);
+    }
+
     return {0, "", ""};
 }
 
 /**
- * @brief 
- * @param args
- * @return 
+ * @brief Change the owner of a file.
+ * @param args Username and file path
+ * @return Status code, empty output on success or an error message on failure
  */
 CommandResult Commands::chownCommand(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        return {1, "", "chown: missing arguments"};    
+    }
+
+    if (args.size() < 2) {
+        return {1, "", "chown: missing operand"};    
+    }
+
+    std::string username = args[0];
+    std::string file = args[1];
+
+    struct passwd* pw = getpwnam(username.c_str());
+    if (!pw) {
+        return {1, "", "chown: no such user found"};
+    }
+    uid_t newOwner = pw->pw_uid;
+
+    for (int i = 1; i < args.size(); i++) {
+        const std::string& file = args[i];
+
+        struct stat st;
+        if (stat(file.c_str(), &st) == -1) {
+            return {1, "", "chown: cannot access '" + file + "': " + std::string(strerror(errno))};
+        }
+
+        if (chown(file.c_str(), newOwner, -1) == -1) {
+            return {1, "", "chown: failed to change owner of '" + file + "': " + std::string(strerror(errno))};
+        }
+    }
+
     return {0, "", ""};
 }
 
 /**
- * @brief 
- * @param args
- * @return 
+ * @brief Search for a pattern in one or more files using regex
+ * @param args The (regex) pattern, the file(s) to search in, and optional flags:
+ *        - "-i"  Perform case-insensitive matching
+ *        - "-n"  Prefix each matching line with its line number
+ *        - "-v"  Select non-matching lines
+ *        - "-w"  Match whole words only
+ *        - "-c"  Print only the count of matching lines
+ *        - "-o"  Print only the matching substring(s) instead of entire lines
+ *        - "-m <num>"  Stop after <num> matches
+ * @return Status code and matched output text, or an error message on failure
  */
 CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
-    return {0, "", ""};
+    /**
+     * TODO: Implement additional flags and support flag combinations
+     */
+
+    if (args.size() < 2) {
+        return {1, "", "grep: missing arguments"};
+    }
+
+    bool opt_i = false;
+    bool opt_n = false;
+    bool opt_v = false;
+    bool opt_w = false;
+    bool opt_c = false;
+    bool opt_o = false;
+    int  opt_m = -1;
+
+    int idx = 0;
+    int flagCount = 0;
+
+    while (idx < args.size() && args[idx][0] == '-') {
+        if (++flagCount > 1) {
+            return {1, "", "grep: only one flag can be used at a time"};
+        }
+
+        const std::string& flag = args[idx];
+
+        if (flag == "-i") opt_i = true;
+        else if (flag == "-n") opt_n = true;
+        else if (flag == "-v") opt_v = true;
+        else if (flag == "-w") opt_w = true;
+        else if (flag == "-c") opt_c = true;
+        else if (flag == "-o") opt_o = true;
+        else if (flag == "-m") {
+            if (idx + 1 >= args.size())
+                return {1, "", "grep: missing argument for -m"};
+            opt_m = std::stoi(args[++idx]);
+        }
+        else break;
+
+        idx++;
+    }
+
+    if (idx >= args.size()) {
+        return {1, "", "grep: missing pattern"};
+    }
+
+    std::string pattern = args[idx++];
+
+    if (idx >= args.size()) {
+        return {1, "", "grep: missing file operand"};
+    }
+    
+    std::regex_constants::syntax_option_type flags;
+    if (opt_i) {
+        flags = std::regex_constants::ECMAScript | std::regex_constants::icase;
+    } else {
+        flags = std::regex_constants::ECMAScript;
+    }
+
+    if (opt_w) pattern = "\\b" + pattern + "\\b";
+
+    std::regex re;
+    try {
+        re = std::regex(pattern, flags);
+    } catch (...) {
+        return {1, "", "grep: invalid regex"};
+    }
+
+    bool multipleFiles = (args.size() - idx) > 1;
+
+    int totalMatches = 0;
+    std::string output;
+
+
+    for (int i = idx; i < args.size(); i++) {
+
+        const std::string& file = args[i];
+
+        int fd = open(file.c_str(), O_RDONLY);
+        if (fd == -1) {
+            return {1, "", "grep: cannot open file '" + file + "'"};
+        }
+
+        char buffer[1024];
+        ssize_t bytes;
+        std::string lineBuffer;
+        int lineNumber = 1;
+
+        while ((bytes = read(fd, buffer, sizeof(buffer))) > 0) {
+            lineBuffer.append(buffer, bytes);
+
+            size_t newlinePos;
+            while ((newlinePos = lineBuffer.find('\n')) != std::string::npos) {
+                std::string line = lineBuffer.substr(0, newlinePos);
+                lineBuffer.erase(0, newlinePos + 1);
+
+                std::string matchedText;
+                bool matched = matchesPattern(line, re, opt_o, matchedText);
+
+                if (opt_v) {
+                    matched = !matched;
+                }
+
+                if (matched) {
+                    totalMatches++;
+
+                    if (opt_m != -1 && totalMatches > opt_m) {
+                        close(fd);
+                        if (opt_c){
+                            return {0, std::to_string(totalMatches), ""};
+                        }
+
+                        if (!output.empty() && output.back() == '\n') {
+                            output.pop_back();
+                        }
+
+                        return {0, output, ""};
+                    }
+
+                    if (!opt_c) {
+                        if (multipleFiles) {
+                            output += file + ":";
+                        }
+
+                        if (opt_n) {
+                            output += std::to_string(lineNumber) + ":";
+                        }
+
+                        output += matchedText + "\n";
+                    }
+                }
+
+                lineNumber++;
+            }
+        }
+
+        // Last line if it's not newline
+        if (!lineBuffer.empty()) {
+            std::string matchedText;
+            bool matched = matchesPattern(lineBuffer, re, opt_o, matchedText);
+
+            if (opt_v) {
+                matched = !matched;
+            }
+
+            if (matched) {
+                totalMatches++;
+                if (opt_m != -1 && totalMatches > opt_m) {
+                    close(fd);
+                    if (opt_c) {
+                        return {0, std::to_string(totalMatches), ""};
+                    }
+
+                    if (!output.empty() && output.back() == '\n') {
+                        output.pop_back();
+                    }
+
+                    return {0, output, ""};
+                }
+
+                if (!opt_c) {
+                    if (multipleFiles) {
+                        output += file + ":";
+                    }
+
+                    if (opt_n) {
+                        output += std::to_string(lineNumber) + ":";
+                    }
+
+                    output += matchedText + "\n";
+                }
+            }
+        }
+
+        close(fd);
+    }
+
+    if (opt_c) {
+        return {0, std::to_string(totalMatches), ""};
+    }
+
+    if (totalMatches == 0) {
+        return {1, "", ""};
+    }
+
+    if (!output.empty() && output.back() == '\n') {
+        output.pop_back();
+    }
+
+    return {0, output, ""};
 }
 
 /* --- Helper Functions --- */
@@ -310,4 +632,20 @@ std::string Commands::formatRmdirErrorMsg(const std::string& path) {
         default:
             return "rmdir: failed to remove '" + path + "': " + std::string(strerror(errno));
     }
+}
+
+bool Commands::matchesPattern(const std::string& line, const std::regex& re, bool printOnlyMatch, std::string& outMatch) {
+    std::smatch match;
+    
+    if (!std::regex_search(line, match, re)) {
+        return false;
+    }
+
+    if (printOnlyMatch) {
+        outMatch = match.str();
+    } else {
+        outMatch = line;
+    }
+
+    return true;
 }
