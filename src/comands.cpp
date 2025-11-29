@@ -16,7 +16,12 @@
 #include <fcntl.h>
 #include <dirent.h>
 
-CommandResult Commands::help(const std::vector<std::string>& args) {
+/**
+ * @brief Display a list of all supported shell commands
+ * @param args Must be empty
+ * @return Status code and a help message on success
+ */
+CommandResult Commands::helpCommand(const std::vector<std::string>& args) {
     if (!args.empty()) {
         return {1, "", "help: this command takes no arguments"};
     }
@@ -48,22 +53,12 @@ CommandResult Commands::help(const std::vector<std::string>& args) {
     return {0, out, ""};
 }
 
-/*int Commands::pwd(const std::vector<std::string>& args) {
-    char cwd[PATH_MAX];
-    std::cout << getcwd(cwd, sizeof(cwd)) << "\n";
-    return 0;
-}
-
-int Commands::quit(const std::vector<std::string>& args) {
-    std::cout << "Exiting MyShell...\n";
-    std::exit(0); 
-}
-int Commands::clr(const std::vector<std::string>& args) {
-    std::cout << "\033[H\033[J" << std::flush; //ANSI escape code which works on most terminals. It escapes with \033, then [H moves the cursor to the home position, and [J clears the screen from the cursor down.
-    return 0; 
-*/
-
-CommandResult Commands::echo(const std::vector<std::string>& args) {
+/**
+ * @brief Print all provided arguments separated by single spaces
+ * @param args A vector of strings to print
+ * @return Status code and the formatted output text
+ */
+CommandResult Commands::echoCommand(const std::vector<std::string>& args) {
     std::string out;
 
     for (const std::string& arg : args) {
@@ -73,7 +68,12 @@ CommandResult Commands::echo(const std::vector<std::string>& args) {
     return {0, out, ""};
 }
 
-CommandResult Commands::pause(const std::vector<std::string> &args)
+/**
+ * @brief Pause execution of process
+ * @param args Must be empty
+ * @return Status code, empty output on success or error message on failure
+ */
+CommandResult Commands::pauseCommand(const std::vector<std::string> &args)
 {
     if (!args.empty()){
         return {1, "", "pause: this command takes no arguments"};
@@ -83,7 +83,15 @@ CommandResult Commands::pause(const std::vector<std::string> &args)
     return {0, "", ""};
 }
 
-CommandResult Commands::ls(const std::vector<std::string>& args) {
+/**
+ * @brief List the contents of the current working directory
+ * @param args Optional flags:
+ *        - "-a" include hidden entries
+ *        - "-A" exclude "." and ".."
+ *        - "-l" include detailed file information (permissions, access rights)
+ * @return Status code, directory listing output, and possible error messages
+ */
+CommandResult Commands::lsCommand(const std::vector<std::string>& args) {
     bool showAll = false;
     bool almostAll = false; 
     bool longList = false; 
@@ -113,13 +121,10 @@ CommandResult Commands::ls(const std::vector<std::string>& args) {
     while ((dp = readdir(dirp)) != nullptr) {
         std::string name = dp->d_name;
 
-        // Hide dotfiles unless -a or -A
         if (!showAll && !almostAll && name[0] == '.') continue;
 
-        // -A hides only . and ..
         if (almostAll && (name == "." || name == "..")) continue;
 
-        // Long listing
         if (longList) {
             struct stat info;
             if (stat(name.c_str(), &info) == -1) {
@@ -152,12 +157,45 @@ CommandResult Commands::ls(const std::vector<std::string>& args) {
     return {0, out, err};
 }
 
-// Alias for `ls`
-CommandResult Commands::dir(const std::vector<std::string>& args) {
-    return ls(args);
+/**
+ * @brief Alias for ls command
+ * @param args Refer to ls command
+ * @return Status code, directory listing output, and possible error messages
+ */
+CommandResult Commands::dirCommand(const std::vector<std::string>& args) {
+    return lsCommand(args);
 }
 
-CommandResult Commands::cd(const std::vector<std::string>& args) {
+/**
+ * @brief Change the current working directory
+ * @param args
+ *        - zero arguments: go to the home directory
+ *        - one argument: change to the specified path (supports ~ expansion)
+ * @return Status code, empty output on success or error message on failure
+ */
+CommandResult Commands::cdCommand(const std::vector<std::string>& args) {
+    const char* home = getenv("HOME");
+
+    if (args.empty()){
+        if(chdir(home) == -1) {
+            return {1, "", "cd: failed to change directory"};
+        };
+    } else if (args.size() == 1) {
+        std::string path = args[0];
+
+        if (path[0] == '~') {
+            path = std::string(home) + path.substr(1);
+        } 
+
+        if(chdir(path.c_str()) == -1) {
+            std::string errorMsg = "cd: failed to change directory: " + path;
+            return {1, "", errorMsg};
+        };
+
+    } else {
+        return {1, "", "cd: too many arguments"};
+    }
+
     return {0, "", ""};
 }
 
@@ -407,4 +445,123 @@ CommandResult Commands::rm(const std::vector<std::string>& args) {
     }
 
     return {errors.empty() ? 0 : 1, output, errors};
+/**
+ * @brief Deletes the specified directory
+ * @param args
+ *       - one argument: path to the directory to remove
+ *       - two arguments: "-p" flag followed by the specified paths to remove
+ * * @return Status code, directory deletion messages on success, or an error message on failure
+ */
+CommandResult Commands::rmdirCommand(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        return {1, "", "rmdir: missing operand"};
+    }
+
+    if (args.size() == 2) {
+        if (args[0] == "-p") {
+            std::string path = args[1];
+            std::string out = "";
+
+            if (path.empty()) {
+                return {1, "", "rmdir: no path specified"};
+            }
+
+            // Avoids possible infinite loops (because of trailing slashes)
+            while (!path.empty() && path.back() == '/') {
+                path.pop_back();
+            }
+
+            while (!path.empty()) {
+
+                if (rmdir(path.c_str()) == -1) {
+                    return {1, "", formatRmdirErrorMsg(path)};
+                }
+
+                out += "Removed directory: " + path + "\n";
+
+                size_t pos = path.find_last_of('/');
+                if (pos == std::string::npos) break;
+
+                path = path.substr(0, pos);
+
+                // Avoids deleting the root directory
+                if (path == "" || path == "/") break;
+            }
+
+            return {0, out, ""};
+        }
+        else {
+            return {1, "", "rmdir: unrecognized option '" + args[0] + "'"};
+        }
+    }
+
+    if (args.size() > 2) {
+        return {1, "", "rmdir: too many arguments"};
+    }
+
+    std::string path = args[0];
+
+    if (rmdir(path.c_str()) == -1) {
+        return {1, "", formatRmdirErrorMsg(path)};
+    }
+
+    return {0, "Removed directory: " + path, ""};
+}
+
+/**
+ * @brief 
+ * @param args
+ * @return 
+ */
+CommandResult Commands::touchCommand(const std::vector<std::string>& args) {
+    return {0, "", ""};
+}
+
+/**
+ * @brief 
+ * @param args
+ * @return 
+ */
+CommandResult Commands::cpCommand(const std::vector<std::string>& args) {
+    return {0, "", ""};
+}
+
+/**
+ * @brief 
+ * @param args
+ * @return 
+ */
+CommandResult Commands::chownCommand(const std::vector<std::string>& args) {
+    return {0, "", ""};
+}
+
+/**
+ * @brief 
+ * @param args
+ * @return 
+ */
+CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
+    return {0, "", ""};
+}
+
+/* --- Helper Functions --- */
+std::string Commands::formatRmdirErrorMsg(const std::string& path) {
+    switch (errno) {
+        case ENOTEMPTY:
+        case EEXIST:
+            return "rmdir: failed to remove '" + path + "': directory not empty";
+
+        case ENOENT:
+            return "rmdir: failed to remove '" + path + "': no such file or directory";
+
+        case ENOTDIR:
+            return "rmdir: failed to remove '" + path + "': not a directory";
+
+        case EACCES:
+        case EPERM:
+            return "rmdir: failed to remove '" + path + "': permission denied";
+
+        default:
+            return "rmdir: failed to remove '" + path + "': " + std::string(strerror(errno));
+    }
 }
