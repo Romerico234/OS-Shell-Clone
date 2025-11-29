@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <regex>
 
 struct CommandResult {
     int status;
@@ -26,4 +27,5 @@ public:
 
 private:
     static std::string formatRmdirErrorMsg(const std::string& path);
+    static bool matchesPattern(const std::string& line, const std::regex& re, bool printOnlyMatch, std::string& outMatch);
 }; 
