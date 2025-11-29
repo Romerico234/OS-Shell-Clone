@@ -8,6 +8,7 @@
 #include <string.h>
 #include <iostream>
 #include <fcntl.h>
+#include <pwd.h>
 
 /**
  * @brief Display a list of all supported shell commands
@@ -368,11 +369,41 @@ CommandResult Commands::cpCommand(const std::vector<std::string>& args) {
 }
 
 /**
- * @brief 
- * @param args
- * @return 
+ * @brief Change the owner of a file.
+ * @param args Username and file path
+ * @return Status code, empty output on success or an error message on failure
  */
 CommandResult Commands::chownCommand(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        return {1, "", "chown: missing arguments"};    
+    }
+
+    if (args.size() == 1) {
+        return {1, "", "chown: missing file path"};    
+    }
+
+    if (args.size() > 2) {
+        return {1, "", "chown: too many arguments"};    
+    }
+
+    std::string username = args[0];
+    std::string file = args[1];
+
+    struct passwd* pw = getpwnam(username.c_str());
+    if (!pw) {
+        return {1, "", "chown: no such user found"};
+    }
+    uid_t newOwner = pw->pw_uid;
+
+    struct stat st;
+    if (stat(file.c_str(), &st) == -1) {
+        return {1, "", "chown: cannot access '" + file + "': " + std::string(strerror(errno))};
+    }
+
+    if (chown(file.c_str(), newOwner, -1) == -1) {
+        return {1, "", "chown: failed to change owner: " + std::string(strerror(errno))};
+    }
+
     return {0, "", ""};
 }
 
