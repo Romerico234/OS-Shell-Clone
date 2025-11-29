@@ -445,6 +445,7 @@ CommandResult Commands::rm(const std::vector<std::string>& args) {
     }
 
     return {errors.empty() ? 0 : 1, output, errors};
+}
 /**
  * @brief Deletes the specified directory
  * @param args
