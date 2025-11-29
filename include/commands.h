@@ -28,4 +28,5 @@ public:
 private:
     static std::string formatRmdirErrorMsg(const std::string& path);
     static bool matchesPattern(const std::string& line, const std::regex& re, bool printOnlyMatch, std::string& outMatch);
+    static std::string stripTrailingNewline(const std::string& s);
 }; 

@@ -148,6 +148,8 @@ CommandResult Commands::lsCommand(const std::vector<std::string>& args) {
         out += name + " ";
     }
 
+    out = stripTrailingNewline(out);
+
     closedir(dirp);
     return {0, out, err};
 }
@@ -491,8 +493,7 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
     bool multipleFiles = (args.size() - idx) > 1;
 
     int totalMatches = 0;
-    std::string output;
-
+    std::string out;
 
     for (int i = idx; i < args.size(); i++) {
 
@@ -532,23 +533,23 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
                             return {0, std::to_string(totalMatches), ""};
                         }
 
-                        if (!output.empty() && output.back() == '\n') {
-                            output.pop_back();
+                        if (!out.empty() && out.back() == '\n') {
+                            out.pop_back();
                         }
 
-                        return {0, output, ""};
+                        return {0, out, ""};
                     }
 
                     if (!opt_c) {
                         if (multipleFiles) {
-                            output += file + ":";
+                            out += file + ":";
                         }
 
                         if (opt_n) {
-                            output += std::to_string(lineNumber) + ":";
+                            out += std::to_string(lineNumber) + ":";
                         }
 
-                        output += matchedText + "\n";
+                        out += matchedText + "\n";
                     }
                 }
 
@@ -573,23 +574,23 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
                         return {0, std::to_string(totalMatches), ""};
                     }
 
-                    if (!output.empty() && output.back() == '\n') {
-                        output.pop_back();
+                    if (!out.empty() && out.back() == '\n') {
+                        out.pop_back();
                     }
 
-                    return {0, output, ""};
+                    return {0, out, ""};
                 }
 
                 if (!opt_c) {
                     if (multipleFiles) {
-                        output += file + ":";
+                        out += file + ":";
                     }
 
                     if (opt_n) {
-                        output += std::to_string(lineNumber) + ":";
+                        out += std::to_string(lineNumber) + ":";
                     }
 
-                    output += matchedText + "\n";
+                    out += matchedText + "\n";
                 }
             }
         }
@@ -605,11 +606,9 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
         return {1, "", ""};
     }
 
-    if (!output.empty() && output.back() == '\n') {
-        output.pop_back();
-    }
+    out = stripTrailingNewline(out);
 
-    return {0, output, ""};
+    return {0, out, ""};
 }
 
 /* --- Helper Functions --- */
@@ -648,4 +647,11 @@ bool Commands::matchesPattern(const std::string& line, const std::regex& re, boo
     }
 
     return true;
+}
+
+std::string Commands::stripTrailingNewline(const std::string& s) {
+    if (!s.empty() && s.back() == '\n') {
+        return s.substr(0, s.size() - 1);
+    }
+    return s;
 }
