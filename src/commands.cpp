@@ -614,11 +614,10 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
 
 /**
  * @brief Exit the shell. Terminates the shell program immediately.
- * @param args Must be empty.
+ * @param args Must be empty
  * @return Status code indicating shell termination.
  */
-CommandResult Commands::quitCommand(const std::vector<std::string>& args) 
-{
+CommandResult Commands::quitCommand(const std::vector<std::string>& args) {
     if (!args.empty()) {
         return {1, "", "quit: this command takes no arguments"};
     }
@@ -629,11 +628,10 @@ CommandResult Commands::quitCommand(const std::vector<std::string>& args)
 
 /**
  * @brief Clears all text from the terminal window using ANSI escape codes.
- * @param args Must be empty.
- * @return Status code.
+ * @param args Must be empty
+ * @return Status code, clears shell on success, error message on failure
  */
-CommandResult Commands::clrCommand(const std::vector<std::string>& args) 
-{
+CommandResult Commands::clrCommand(const std::vector<std::string>& args) {
     if (!args.empty()) {
         return {1, "", "clr: this command takes no arguments"};
     }
@@ -644,12 +642,10 @@ CommandResult Commands::clrCommand(const std::vector<std::string>& args)
 
 /**
  * @brief Displays the path of the directory the shell is currently in.
- * @param args Must be empty.
- * @return Status code and the current directory path.
+ * @param args Must be empty
+ * @return Status code and the current directory path
  */
-
-CommandResult Commands::pwdCommand(const std::vector<std::string>& args) 
-{
+CommandResult Commands::pwdCommand(const std::vector<std::string>& args) {
     if (!args.empty()) {
         return {1, "", "pwd: this command takes no arguments"};
     }
@@ -667,8 +663,7 @@ CommandResult Commands::pwdCommand(const std::vector<std::string>& args)
  * @param args Must be empty
  * @return Status code and printed file contents.
  */
-CommandResult Commands::environCommand(const std::vector<std::string>& args) 
-{
+CommandResult Commands::environCommand(const std::vector<std::string>& args) {
     if (!args.empty()) {
         return {1, "", "environ: this command takes no arguments"};
     }
@@ -687,8 +682,7 @@ CommandResult Commands::environCommand(const std::vector<std::string>& args)
  * @param args List of file paths to print.
  * @return Status code and printed file contents.
  */
-CommandResult Commands::catCommand(const std::vector<std::string>& args) 
-{
+CommandResult Commands::catCommand(const std::vector<std::string>& args) {
     if (args.empty()) {
         return {1, "", "cat: missing file operand"};
     }
@@ -720,23 +714,19 @@ CommandResult Commands::catCommand(const std::vector<std::string>& args)
 }
 
 /**  
- * @brief Count lines, words, and characters in a file.
- * Supports both Unix (`\n`) and Windows (`\r\n`) line endings.
- * -l : Count lines
- * -w : Count words
- * -c : Count characters
- * @param args List containing exactly one file path.
- * @return Status code and the resulting counts.
+ * @brief Count number of lines, words, and characters in a file.
+ * @param args List containing exactly one file path and optional files:
+ *        "-l" Count lines
+ *        "-w" Count words
+ *        "-c" Count characters
+ * @return Status code, resulting counts on success, error message on failure.
  */
-
-CommandResult Commands::wcCommand(const std::vector<std::string>& args)
-{
+CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
     bool countLines = false;
     bool countWords = false;
     bool countChars = false;
     std::vector<std::string> files;
 
-    // Parse flags
     for (const std::string& arg : args) {
         if (arg == "-l") countLines = true;
         else if (arg == "-w") countWords = true;
@@ -744,7 +734,6 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args)
         else files.push_back(arg);
     }
 
-    // Default: enable all
     if (!countLines && !countWords && !countChars) {
         countLines = countWords = countChars = true;
     }
@@ -774,10 +763,8 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args)
             for (ssize_t i = 0; i < bytesRead; ++i) {
                 char c = buf[i];
 
-                // Count lines
                 if (c == '\n') lines++;
 
-                // Count words
                 if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
                     inWord = false;
                 } else if (!inWord) {
@@ -785,7 +772,6 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args)
                     inWord = true;
                 }
 
-                // Count all characters (like wc -c), including spaces and newlines
                 chars++;
             }
         }
@@ -796,7 +782,6 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args)
 
         close(fd);
 
-        // Output formatting
         if (countLines) out += std::to_string(lines) + " ";
         if (countWords) out += std::to_string(words) + " ";
         if (countChars) out += std::to_string(chars) + " ";
@@ -808,11 +793,10 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args)
 
 /**
  * @brief Creates a new directory at the specified path.
- * @param args Directory path, optionally with -p as the first argument.
- * @return Status code indicating success or failure.
+ * @param args Directory path, optionally with -p flag 
+ * @return Status code, empty output on success, error message on failure
  */
-CommandResult Commands::mkdirCommand(const std::vector<std::string>& args) 
-{
+CommandResult Commands::mkdirCommand(const std::vector<std::string>& args) {
     if (args.empty()) {
         return {1, "", "mkdir: missing operand"};
     }
@@ -828,20 +812,12 @@ CommandResult Commands::mkdirCommand(const std::vector<std::string>& args)
     return {0, out, err};
 }
 /**
- * @brief Remove a file or directory.
- * Deletes files or directories depending on the flags used.
- * Flags:
- *  - -f : Force removal (ignore missing files; never prompt).
- *  - -r : Recursively remove a directory and its contents.
- * Behavior:
- *  - `rm file` removes a file.
- *  - `rm -f file` forces file deletion.
- *  - `rm -r directory` removes a directory tree.
- *  - `rm -rf directory` forces recursive removal.
- * @param args A file or directory path, with optional -r / -f flags.
- * @return Status code indicating success or failure.
+ * @brief Removes a file or directory tree.
+ * @param args A file or directory path, with optional flags:
+ *        "-f" Force removal (ignore missing files; never prompt).
+ *        "-r" Recursively remove a directory and its contents.
+ * @return Status code, empty output on success, error message on failure
  */
-
 CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
     if (args.empty()) {
         return {1, "", "rm: missing operand"};
@@ -913,12 +889,10 @@ CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
 
 /**
  * @brief Move files or directories from one location to another.
- * Moves the specified source file(s) or directory(s) to the target location.
- * If the target is an existing directory, the source will be placed inside it.
  * @param args Must contain exactly two arguments:
- *        - args[0]: Source file or directory path.
- *        - args[1]: Destination path.
- * @return Status code indicating success or failure, and an error message if applicable.
+ *        - args[0]: Source file or directory path
+ *        - args[1]: Destination path
+ * @return Status code, empty output on success, or an error message on failure
  */
 CommandResult Commands::mvCommand(const std::vector<std::string>& args) {
     if (args.size() != 2) {
@@ -946,9 +920,10 @@ CommandResult Commands::mvCommand(const std::vector<std::string>& args) {
 
 /**
  * @brief Modify file permissions for user, group, and others
- * @param args Expects two arguments: [permissions] [file]
- *             Permissions should be numeric, 644 or 755
- * @return Status code and error message if it fails
+ * @param args Expects two arguments: 
+ *        - permissions (must numeric)
+ *        - file path
+ * @return Status code, empty output on success, or error message on failure
  */
 CommandResult Commands::chmodCommand(const std::vector<std::string>& args) {
     if (args.size() != 2) {
@@ -958,7 +933,6 @@ CommandResult Commands::chmodCommand(const std::vector<std::string>& args) {
     const std::string& permStr = args[0];
     const std::string& filename = args[1];
 
-    // Convert permission string to integer (octal)
     mode_t mode = 0;
     try {
         mode = std::stoi(permStr, nullptr, 8);
