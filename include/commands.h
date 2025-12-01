@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <regex>
 
 struct CommandResult {
     int status;
@@ -35,4 +36,6 @@ static CommandResult mvCommand(const std::vector<std::string>& args);
 static CommandResult chmodCommand(const std::vector<std::string>& args);
 private:
     static std::string formatRmdirErrorMsg(const std::string& path);
+    static bool matchesPattern(const std::string& line, const std::regex& re, bool printOnlyMatch, std::string& outMatch);
+    static std::string stripTrailingNewline(const std::string& s);
 }; 

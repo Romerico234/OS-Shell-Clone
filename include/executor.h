@@ -12,6 +12,15 @@ private:
     static CommandResult execute(const AST& node);
     static CommandResult runCommand(const AST& node);
 
+   /**
+     * TODO:
+     * The following operators are intentionally left unimplemented and are
+     * provided as placeholders for future work.
+     *
+     * Supporting these features requires a broader redesign of the shell's
+     * execution model so that all commands share consistent semantics for 
+     * stdin/stdout, process creation, and control flow.
+     */
     static CommandResult handlePipe(const AST& node);
     static CommandResult handleRedirectOut(const AST& node);
     static CommandResult handleRedirectIn(const AST& node);
