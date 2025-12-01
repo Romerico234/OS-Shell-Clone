@@ -1,18 +1,15 @@
 #include "commands.h"
-#include <limits>
+#include <iostream>
+#include <fstream>
 #include <string>
-#include <dirent.h>
+#include <vector>
+#include <limits>
+#include <limits.h>
+#include <cstring>
+#include <cerrno>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <errno.h>
-#include <string.h>
-#include <iostream>
-#include <string>
-#include <unistd.h>
-#include <limits.h>
-#include <vector>
-#include <errno.h>
 #include <fcntl.h>
 #include <dirent.h>
 
@@ -199,7 +196,12 @@ CommandResult Commands::cdCommand(const std::vector<std::string>& args) {
     return {0, "", ""};
 }
 
-CommandResult Commands::quit(const std::vector<std::string>& args) 
+/**
+ * @brief Exit the shell. Terminates the shell program immediately.
+ * @param args Must be empty.
+ * @return Status code indicating shell termination.
+ */
+CommandResult Commands::quitCommand(const std::vector<std::string>& args) 
 {
     if (!args.empty()) {
         return {1, "", "quit: this command takes no arguments"};
@@ -209,18 +211,28 @@ CommandResult Commands::quit(const std::vector<std::string>& args)
     std::exit(0);
 }
 
-
-CommandResult Commands::clr(const std::vector<std::string>& args) 
+/**
+ * @brief Clears all text from the terminal window using ANSI escape codes.
+ * @param args Must be empty.
+ * @return Status code.
+ */
+CommandResult Commands::clrCommand(const std::vector<std::string>& args) 
 {
     if (!args.empty()) {
         return {1, "", "clr: this command takes no arguments"};
     }
 
-    std::cout << "\033[H\033[J"; //ANSI escape code which works on most terminals. It escapes with \033, then [H moves the cursor to the home position, and [J clears the screen from the cursor down.
+    std::cout << "\033[H\033[J";
     return {0, "", ""};
 }
 
-CommandResult Commands::pwd(const std::vector<std::string>& args) 
+/**
+ * @brief Displays the path of the directory the shell is currently in.
+ * @param args Must be empty.
+ * @return Status code and the current directory path.
+ */
+
+CommandResult Commands::pwdCommand(const std::vector<std::string>& args) 
 {
     if (!args.empty()) {
         return {1, "", "pwd: this command takes no arguments"};
@@ -234,7 +246,12 @@ CommandResult Commands::pwd(const std::vector<std::string>& args)
     return {0, std::string(cwd), ""};
 }
 
-CommandResult Commands::environ(const std::vector<std::string>& args) 
+/**
+ * @brief Display all environment variables
+ * @param args Must be empty
+ * @return Status code and printed file contents.
+ */
+CommandResult Commands::environCommand(const std::vector<std::string>& args) 
 {
     if (!args.empty()) {
         return {1, "", "environ: this command takes no arguments"};
@@ -242,7 +259,6 @@ CommandResult Commands::environ(const std::vector<std::string>& args)
 
     std::string out;
 
-    // Use ::environ to avoid name conflict with Commands::environ
     for (char **env = ::environ; *env != nullptr; env++) {
         out += std::string(*env) + "\n";
     }
@@ -250,26 +266,30 @@ CommandResult Commands::environ(const std::vector<std::string>& args)
     return {0, out, ""};
 }
 
-CommandResult Commands::cat(const std::vector<std::string>& args) 
+/**
+ * @brief Reads and prints the contents of each file provided in order.
+ * @param args List of file paths to print.
+ * @return Status code and printed file contents.
+ */
+CommandResult Commands::catCommand(const std::vector<std::string>& args) 
 {
     if (args.empty()) {
         return {1, "", "cat: missing file operand"};
     }
 
-    std::string out;
-    std::string err;
-    const size_t bufferSize = 4096; // an average buffer size for reading files or just increase it if needed.
+    std::string out, err;
+    const size_t bufferSize = 4096; 
     char buffer[bufferSize];
 
     for (const std::string& filename : args) {
-        int fd = open(filename.c_str(), O_RDONLY); // to open the file and return file descriptor which is the number the OS uses to refer to the open file.
+        int fd = open(filename.c_str(), O_RDONLY); 
         if (fd == -1) {
             err += "cat: cannot open " + filename + ": " + strerror(errno) + "\n";
             continue;
         }
 
         ssize_t bytesRead;
-        while ((bytesRead = read(fd, buffer, bufferSize)) > 0) { //reads buffer size and loops until there is nothing left to read.
+        while ((bytesRead = read(fd, buffer, bufferSize)) > 0) { 
             out.append(buffer, bytesRead);  
         }
 
@@ -283,14 +303,24 @@ CommandResult Commands::cat(const std::vector<std::string>& args)
     return {err.empty() ? 0 : 1, out, err};
 }
 
-CommandResult Commands::wc(const std::vector<std::string>& args) 
+/**  
+ * @brief Count lines, words, and characters in a file.
+ * Supports both Unix (`\n`) and Windows (`\r\n`) line endings.
+ * -l : Count lines
+ * -w : Count words
+ * -c : Count characters
+ * @param args List containing exactly one file path.
+ * @return Status code and the resulting counts.
+ */
+
+ CommandResult Commands::wcCommand(const std::vector<std::string>& args)
 {
     bool countLines = false;
     bool countWords = false;
     bool countChars = false;
     std::vector<std::string> files;
 
-    // Parse arguments
+    // Parse flags
     for (const std::string& arg : args) {
         if (arg == "-l") countLines = true;
         else if (arg == "-w") countWords = true;
@@ -298,9 +328,8 @@ CommandResult Commands::wc(const std::vector<std::string>& args)
         else files.push_back(arg);
     }
 
-    // If no flags specified, count all
-    if (!countLines && !countWords && !countChars) 
-    {
+    // Default: enable all
+    if (!countLines && !countWords && !countChars) {
         countLines = countWords = countChars = true;
     }
 
@@ -311,7 +340,7 @@ CommandResult Commands::wc(const std::vector<std::string>& args)
     std::string out;
     std::string err;
 
-    for (const std::string& filename : files) 
+    for (const std::string& filename : files)
     {
         int fd = open(filename.c_str(), O_RDONLY);
         if (fd == -1) {
@@ -324,17 +353,24 @@ CommandResult Commands::wc(const std::vector<std::string>& args)
         bool inWord = false;
         ssize_t bytesRead;
 
-        while ((bytesRead = read(fd, buf, sizeof(buf))) > 0) {
-            chars += bytesRead;
+        while ((bytesRead = read(fd, buf, sizeof(buf))) > 0)
+        {
             for (ssize_t i = 0; i < bytesRead; ++i) {
                 char c = buf[i];
+
+                // Count lines
                 if (c == '\n') lines++;
-                if (isspace(c)) {
+
+                // Count words
+                if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
                     inWord = false;
                 } else if (!inWord) {
                     words++;
                     inWord = true;
                 }
+
+                // Count all characters (like wc -c), including spaces and newlines
+                chars++;
             }
         }
 
@@ -344,7 +380,7 @@ CommandResult Commands::wc(const std::vector<std::string>& args)
 
         close(fd);
 
-        // Format output according to flags
+        // Output formatting
         if (countLines) out += std::to_string(lines) + " ";
         if (countWords) out += std::to_string(words) + " ";
         if (countChars) out += std::to_string(chars) + " ";
@@ -354,25 +390,45 @@ CommandResult Commands::wc(const std::vector<std::string>& args)
     return {0, out, err};
 }
 
-CommandResult Commands::mkdir(const std::vector<std::string>& args) 
+
+
+/**
+ * @brief Creates a new directory at the specified path.
+ * @param args Directory path, optionally with -p as the first argument.
+ * @return Status code indicating success or failure.
+ */
+CommandResult Commands::mkdirCommand(const std::vector<std::string>& args) 
 {
     if (args.empty()) {
         return {1, "", "mkdir: missing operand"};
     }
 
-    std::string out;
-    std::string err;
+    std::string out, err;
 
     for (const std::string& dir : args) {
-        if (::mkdir(dir.c_str(), 0755) == -1) { //0755 is a common permission setting for directories. 7 means read, write, and execute permissions for the owner, 5 means read and execute permissions for the group, and 5 means read and execute permissions for others.
+        if (::mkdir(dir.c_str(), 0755) == -1) { 
             err += "mkdir: cannot create directory '" + dir + "': " + strerror(errno) + "\n";
         }
     }
 
     return {0, out, err};
 }
+/**
+ * @brief Remove a file or directory.
+ * Deletes files or directories depending on the flags used.
+ * Flags:
+ *  - -f : Force removal (ignore missing files; never prompt).
+ *  - -r : Recursively remove a directory and its contents.
+ * Behavior:
+ *  - `rm file` removes a file.
+ *  - `rm -f file` forces file deletion.
+ *  - `rm -r directory` removes a directory tree.
+ *  - `rm -rf directory` forces recursive removal.
+ * @param args A file or directory path, with optional -r / -f flags.
+ * @return Status code indicating success or failure.
+ */
 
-CommandResult Commands::rm(const std::vector<std::string>& args) {
+CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
     if (args.empty()) {
         return {1, "", "rm: missing operand"};
     }
@@ -381,70 +437,64 @@ CommandResult Commands::rm(const std::vector<std::string>& args) {
     bool force = false;
     size_t currentArg = 0;
 
-    // Parse flags like -r and -f
     while (currentArg < args.size() && args[currentArg][0] == '-') {
         const std::string& flag = args[currentArg];
         if (flag.find('r') != std::string::npos) recursive = true;
-        if (flag.find('f') != std::string::npos) force = true;
         currentArg++;
         if (currentArg == args.size()) {
             return {1, "", "rm: missing operand after '" + flag + "'"};
         }
     }
 
-    std::string output;
-    std::string errors;
+    std::string out;
+    std::string err;
 
-    // Loop through each file/directory argument
     for (; currentArg < args.size(); ++currentArg) {
         const std::string& path = args[currentArg];
 
         struct stat st;
         if (stat(path.c_str(), &st) == -1) {
             if (!force) {
-                errors += "rm: cannot access '" + path + "': " + strerror(errno) + "\n";
+                err += "rm: cannot access '" + path + "': " + strerror(errno) + "\n";
             }
             continue;
         }
 
-        // If it's a directory
         if (S_ISDIR(st.st_mode)) {
             if (recursive) {
                 DIR* dir = opendir(path.c_str());
                 if (!dir) {
                     if (!force) {
-                        errors += "rm: cannot open directory '" + path + "': " + strerror(errno) + "\n";
+                        err += "rm: cannot open directory '" + path + "': " + strerror(errno) + "\n";
                     }
                     continue;
                 }
 
-                // Recursively remove contents
                 struct dirent* entry;
                 while ((entry = readdir(dir)) != nullptr) {
                     std::string name = entry->d_name;
                     if (name == "." || name == "..") continue;
                     std::string subpath = path + "/" + name;
-                    rm({recursive ? "-r" : "", force ? "-f" : "", subpath});
+                    rmCommand({recursive ? "-r" : "", force ? "-f" : "", subpath});
                 }
                 closedir(dir);
 
-                // Remove the empty directory itself
                 if (::rmdir(path.c_str()) == -1 && !force) {
-                    errors += "rm: failed to remove directory '" + path + "': " + strerror(errno) + "\n";
+                    err += "rm: failed to remove directory '" + path + "': " + strerror(errno) + "\n";
                 }
             } else {
-                if (!force) errors += "rm: '" + path + "' is a directory\n";
+                if (!force) err += "rm: '" + path + "' is a directory\n";
             }
         } 
-        // If it's a regular file
+
         else {
             if (::unlink(path.c_str()) == -1 && !force) {
-                errors += "rm: cannot remove '" + path + "': " + strerror(errno) + "\n";
+                err += "rm: cannot remove '" + path + "': " + strerror(errno) + "\n";
             }
         }
     }
 
-    return {errors.empty() ? 0 : 1, output, errors};
+    return {err.empty() ? 0 : 1, out, err};
 }
 /**
  * @brief Deletes the specified directory
@@ -542,6 +592,68 @@ CommandResult Commands::chownCommand(const std::vector<std::string>& args) {
  * @return 
  */
 CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
+    return {0, "", ""};
+}
+
+/**
+ * @brief Move files or directories from one location to another.
+ * Moves the specified source file(s) or directory(s) to the target location.
+ * If the target is an existing directory, the source will be placed inside it.
+ * @param args Must contain exactly two arguments:
+ *        - args[0]: Source file or directory path.
+ *        - args[1]: Destination path.
+ * @return Status code indicating success or failure, and an error message if applicable.
+ */
+CommandResult Commands::mvCommand(const std::vector<std::string>& args) {
+    if (args.size() != 2) {
+        return {1, "", "mv: requires exactly two arguments: source and destination"};
+    }
+
+    const std::string& src = args[0];
+    std::string dst = args[1];
+
+    struct stat st;
+    if (stat(dst.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+        std::string filename = src.substr(src.find_last_of("/\\") + 1);
+        if (dst.back() != '/' && dst.back() != '\\') {
+            dst += "/";
+        }
+        dst += filename;
+    }
+
+    if (std::rename(src.c_str(), dst.c_str()) != 0) {
+        return {1, "", "mv: failed to move '" + src + "' to '" + dst + "': " + strerror(errno)};
+    }
+
+    return {0, "", ""};
+}
+
+/**
+ * @brief Modify file permissions for user, group, and others
+ * @param args Expects two arguments: [permissions] [file]
+ *             Permissions should be numeric, 644 or 755
+ * @return Status code and error message if it fails
+ */
+CommandResult Commands::chmodCommand(const std::vector<std::string>& args) {
+    if (args.size() != 2) {
+        return {1, "", "chmod: requires exactly two arguments: permissions and file"};
+    }
+
+    const std::string& permStr = args[0];
+    const std::string& filename = args[1];
+
+    // Convert permission string to integer (octal)
+    mode_t mode = 0;
+    try {
+        mode = std::stoi(permStr, nullptr, 8);
+    } catch (...) {
+        return {1, "", "chmod: invalid permissions format"};
+    }
+
+    if (chmod(filename.c_str(), mode) != 0) {
+        return {1, "", "chmod: failed to change permissions for '" + filename + "': " + strerror(errno)};
+    }
+
     return {0, "", ""};
 }
 
