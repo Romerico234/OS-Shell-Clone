@@ -323,7 +323,7 @@ CommandResult Commands::cpCommand(const std::vector<std::string>& args) {
     for (int i = 0; i < numSources; i++) {
         std::string src = args[i];
 
-        // Rejecting directory sources b/c no -r support yet
+        // Rejecting directory sources because no -r support yet
         struct stat stSrc;
         if (stat(src.c_str(), &stSrc) == 0 && S_ISDIR(stSrc.st_mode)) {
             return {1, "", "cp: omitting directory '" + src + "'"};
@@ -633,17 +633,10 @@ CommandResult Commands::quitCommand(const std::vector<std::string>& args) {
  */
 CommandResult Commands::clrCommand(const std::vector<std::string>& args) {
     if (!args.empty()) {
-        try 
-        {
-            std::regex re(args[0]);
-            return {0, "", ""};
-        } catch (const std::regex_error& e)
-        {
-            return {1, "", "clr: invalid rregex"};
-        }
+        return {1, "", "clr: takes no arguments"};
     }
-    std::cout << "\033[H\033[J";
-    return {0, "", ""};
+
+    return {0, "\033[H\033[J", ""};
     }
 
 
@@ -694,15 +687,14 @@ CommandResult Commands::catCommand(const std::vector<std::string>& args) {
         return {1, "", "cat: missing file operand"};
     }
 
-    std::string out, err;
+    std::string out;
     const size_t bufferSize = 4096; 
     char buffer[bufferSize];
 
     for (const std::string& filename : args) {
         int fd = open(filename.c_str(), O_RDONLY); 
         if (fd == -1) {
-            err += "cat: cannot open " + filename + ": " + strerror(errno) + "\n";
-            continue;
+            return {1, "", "cat: cannot open " + filename + ": " + strerror(errno)};
         }
 
         ssize_t bytesRead;
@@ -711,13 +703,13 @@ CommandResult Commands::catCommand(const std::vector<std::string>& args) {
         }
 
         if (bytesRead == -1) {
-            err += "cat: error reading " + filename + ": " + strerror(errno) + "\n";
+            return {1, "", "cat: error reading " + filename + ": " + strerror(errno)};
         }
 
         close(fd);
     }
 
-    return {err.empty() ? 0 : 1, out, err};
+    return {0, out, ""};
 }
 
 /**  
@@ -734,7 +726,6 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
     bool countChars = false;
     std::vector<std::string> files;
 
-    // Parse flags and file names
     for (const std::string& arg : args) {
         if (arg == "-l") countLines = true;
         else if (arg == "-w") countWords = true;
@@ -742,7 +733,6 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
         else files.push_back(arg);
     }
 
-    // If no flags, count all
     if (!countLines && !countWords && !countChars) {
         countLines = countWords = countChars = true;
     }
@@ -752,7 +742,6 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
     }
 
     std::string out;
-    std::string err;
 
     auto isFileEmpty = [](const std::string& filename) -> bool {
         struct stat st;
@@ -775,8 +764,7 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
 
         int fd = open(filename.c_str(), O_RDONLY);
         if (fd == -1) {
-            err += "wc: cannot open file '" + filename + "': " + strerror(errno) + "\n";
-            continue;
+            return {1, "", "wc: cannot open file '" + filename + "': " + strerror(errno)};
         }
 
         size_t lines = 0, words = 0, chars = 0;
@@ -809,7 +797,7 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
         if (!lastCharWasNewline) lines++;
 
         if (bytesRead == -1) {
-            err += "wc: error reading file '" + filename + "': " + strerror(errno) + "\n";
+            return {1, "", "wc: error reading file '" + filename + "': " + strerror(errno)};
         }
 
         close(fd);
@@ -820,7 +808,7 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
         out += filename + "\n";
     }
 
-    return {err.empty() ? 0 : 1, out, err};
+    return {0, out, ""};
 }
 
 
@@ -838,11 +826,11 @@ CommandResult Commands::mkdirCommand(const std::vector<std::string>& args) {
 
     for (const std::string& dir : args) {
         if (mkdir(dir.c_str(), 0755) == -1) { 
-            err += "mkdir: cannot create directory '" + dir + "': " + strerror(errno) + "\n";
+            return {1, "", "mkdir: cannot create directory '" + dir + "': " + strerror(errno)};
         }
     }
 
-    return {0, out, err};
+    return {0, out, ""};
 }
 /**
  * @brief Removes a file or directory tree.
@@ -857,13 +845,16 @@ CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
     }
 
     bool recursive = false;
-    size_t currentArg = 0;
+    int currentArg = 0;
 
-    // Parse flags (only -r supported)
     while (currentArg < args.size() && args[currentArg][0] == '-') {
         const std::string& flag = args[currentArg];
-        if (flag.find('r') != std::string::npos) recursive = true;
-        else return {1, "", "rm: invalid option '" + flag + "'"};
+        if (flag.find('r') != std::string::npos) {
+            recursive = true;
+        } else {
+            return {1, "", "rm: invalid option '" + flag + "'"};
+        }
+        
         currentArg++;
         if (currentArg == args.size()) {
             return {1, "", "rm: missing operand after '" + flag + "'"};
@@ -871,23 +862,20 @@ CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
     }
 
     std::string out;
-    std::string err;
 
     for (; currentArg < args.size(); ++currentArg) {
         const std::string& path = args[currentArg];
 
         struct stat st;
         if (stat(path.c_str(), &st) == -1) {
-            err += "rm: cannot access '" + path + "': " + strerror(errno) + "\n";
-            continue;
+            return {1, "", "rm: cannot access '" + path + "': " + strerror(errno)};
         }
 
         if (S_ISDIR(st.st_mode)) {
             if (recursive) {
                 DIR* dir = opendir(path.c_str());
                 if (!dir) {
-                    err += "rm: cannot open directory '" + path + "': " + strerror(errno) + "\n";
-                    continue;
+                    return {1, "", "rm: cannot open directory '" + path + "': " + strerror(errno)};
                 }
 
                 struct dirent* entry;
@@ -899,22 +887,22 @@ CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
                 }
                 closedir(dir);
 
-                if (::rmdir(path.c_str()) == -1) {
-                    err += "rm: failed to remove directory '" + path + "': " + strerror(errno) + "\n";
+                if (rmdir(path.c_str()) == -1) {
+                    return {1, "", "rm: failed to remove directory '" + path + "': " + strerror(errno)};
                 }
+
             } else {
-                err += "rm: '" + path + "' is a directory\n";
+                return {1, "", "rm: '" + path + "' is a directory"};
             }
         } else {
-            if (::unlink(path.c_str()) == -1) {
+            if (unlink(path.c_str()) == -1) {
                 err += "rm: cannot remove '" + path + "': " + strerror(errno) + "\n";
             }
         }
     }
 
-    return {err.empty() ? 0 : 1, out, err};
+    return {0, out, ""};
 }
-
 
 /**
  * @brief Move files or directories from one location to another.
@@ -929,19 +917,19 @@ CommandResult Commands::mvCommand(const std::vector<std::string>& args) {
     }
 
     const std::string& src = args[0];
-    std::string dst = args[1];
+    std::string dest = args[1];
 
     struct stat st;
-    if (stat(dst.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+    if (stat(dest.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
         std::string filename = src.substr(src.find_last_of("/\\") + 1);
-        if (dst.back() != '/' && dst.back() != '\\') {
-            dst += "/";
+        if (dest.back() != '/' && dest.back() != '\\') {
+            dest += "/";
         }
-        dst += filename;
+        dest += filename;
     }
 
-    if (std::rename(src.c_str(), dst.c_str()) != 0) {
-        return {1, "", "mv: failed to move '" + src + "' to '" + dst + "': " + strerror(errno)};
+    if (std::rename(src.c_str(), dest.c_str()) != 0) {
+        return {1, "", "mv: failed to move '" + src + "' to '" + dest + "': " + strerror(errno)};
     }
 
     return {0, "", ""};
