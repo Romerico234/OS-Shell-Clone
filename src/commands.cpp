@@ -35,10 +35,10 @@ CommandResult Commands::helpCommand(const std::vector<std::string>& args) {
         "  chown <owner> <file>                     Change ownership.\n"
         "  ls [-a] [-A] [-l] [path]                 List directory contents.\n"
         "  pwd                                      Print working directory.\n"
-        "  cat <file>                               Print file contents.\n"
+        "  cat <file>...                            Print file contents.\n"
         "  mkdir <dir>                              Create directory.\n"
         "  rmdir <dir>                              Remove directory.\n"
-        "  rm [-r] [-f] <path>                      Remove file or directory.\n"
+        "  rm [-r] <path>                           Remove file or directory.\n"
         "  cp <src>... <dst>                        Copy.\n"
         "  mv <src> <dst>                           Move.\n"
         "  touch <file>                             Create empty file.\n"
@@ -148,10 +148,8 @@ CommandResult Commands::lsCommand(const std::vector<std::string>& args) {
         out += name + " ";
     }
 
-    out = stripTrailingNewline(out);
-
     closedir(dirp);
-    return {0, out, err};
+    return {0, stripTrailingNewline(out), err};
 }
 
 /**
@@ -606,9 +604,7 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
         return {1, "", ""};
     }
 
-    out = stripTrailingNewline(out);
-
-    return {0, out, ""};
+    return {0, stripTrailingNewline(out), ""};
 }
 
 
@@ -622,7 +618,7 @@ CommandResult Commands::quitCommand(const std::vector<std::string>& args) {
         return {1, "", "quit: this command takes no arguments"};
     }
 
-    std::cout << "[Process completed]\n";
+    std::cout << "[Shell Terminated]\n";
     std::exit(0);
 }
 
@@ -636,9 +632,9 @@ CommandResult Commands::clrCommand(const std::vector<std::string>& args) {
         return {1, "", "clr: takes no arguments"};
     }
 
-    return {0, "\033[H\033[J", ""};
-    }
-
+    // __NO_NL__ is a marker to notify the shell NOT to print out a newline
+    return {0, "__NO_NL__\e[H\e[J", ""};
+}
 
 /**
  * @brief Displays the path of the directory the shell is currently in.
@@ -674,13 +670,13 @@ CommandResult Commands::environCommand(const std::vector<std::string>& args) {
         out += std::string(*env) + "\n";
     }
 
-    return {0, out, ""};
+    return {0, stripTrailingNewline(out), ""};
 }
 
 /**
  * @brief Reads and prints the contents of each file provided in order.
- * @param args List of file paths to print.
- * @return Status code and printed file contents.
+ * @param args List of file paths to print
+ * @return Status code, printed file contents on success, or error message on failure
  */
 CommandResult Commands::catCommand(const std::vector<std::string>& args) {
     if (args.empty()) {
@@ -706,10 +702,12 @@ CommandResult Commands::catCommand(const std::vector<std::string>& args) {
             return {1, "", "cat: error reading " + filename + ": " + strerror(errno)};
         }
 
+        out.append("\n");  
+
         close(fd);
     }
 
-    return {0, out, ""};
+    return {0, stripTrailingNewline(out), ""};
 }
 
 /**  
@@ -808,18 +806,18 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
         out += filename + "\n";
     }
 
-    return {0, out, ""};
+    return {0, stripTrailingNewline(out), ""};
 }
 
 
 /**
  * @brief Creates a new directory at the specified path.
- * @param args Directory path, optionally with -p flag 
+ * @param args Directory path  
  * @return Status code, empty output on success, error message on failure
  */
 CommandResult Commands::mkdirCommand(const std::vector<std::string>& args) {
     if (args.empty()) {
-        return {1, "", "mkdir: missing operand"};
+        return {1, "", "mkdir: missing directory argument"};
     }
 
     std::string out, err;
@@ -832,11 +830,11 @@ CommandResult Commands::mkdirCommand(const std::vector<std::string>& args) {
 
     return {0, out, ""};
 }
+
 /**
  * @brief Removes a file or directory tree.
  * @param args A file or directory path, with optional flags:
- *        "-f" Force removal (ignore missing files; never prompt).
- *        "-r" Recursively remove a directory and its contents.
+ *        "-r" Recursively remove a directory and its contents
  * @return Status code, empty output on success, error message on failure
  */
 CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
@@ -928,6 +926,10 @@ CommandResult Commands::mvCommand(const std::vector<std::string>& args) {
         dest += filename;
     }
 
+    /**
+     * TODO: rename() fails with EXDEV ("Invalid cross-device link") when the source 
+     * and destination are on different filesystems (like on Docker bind mounts).
+    */
     if (std::rename(src.c_str(), dest.c_str()) != 0) {
         return {1, "", "mv: failed to move '" + src + "' to '" + dest + "': " + strerror(errno)};
     }
@@ -938,7 +940,7 @@ CommandResult Commands::mvCommand(const std::vector<std::string>& args) {
 /**
  * @brief Modify file permissions for user, group, and others
  * @param args Expects two arguments: 
- *        - permissions (must numeric)
+ *        - permissions (must be numeric)
  *        - file path
  * @return Status code, empty output on success, or error message on failure
  */
@@ -947,12 +949,12 @@ CommandResult Commands::chmodCommand(const std::vector<std::string>& args) {
         return {1, "", "chmod: requires exactly two arguments: permissions and file"};
     }
 
-    const std::string& permStr = args[0];
+    const std::string& perm = args[0];
     const std::string& filename = args[1];
 
     mode_t mode = 0;
     try {
-        mode = std::stoi(permStr, nullptr, 8);
+        mode = std::stoi(perm, nullptr, 8);
     } catch (...) {
         return {1, "", "chmod: invalid permissions format"};
     }

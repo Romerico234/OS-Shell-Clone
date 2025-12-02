@@ -33,19 +33,30 @@ int main() {
 
             CommandResult result = Executor::executeCommand(ast);
 
-            bool hasOutput = false;
+            bool printNewline = false;
 
             if (result.status == 0) {
+                if (!result.output.empty()) {
+                    printNewline = true;
+                }
+
+                if (result.output.rfind("__NO_NL__", 0) == 0) {
+                    printNewline = false;
+                    result.output = result.output.substr(9); 
+                }
+
                 std::cout << result.output;
-                if (!result.output.empty()) hasOutput = true;
             }
 
             if (result.status == 1) {
+                if (!result.error.empty()) {
+                    printNewline = true;
+                }
+                
                 std::cerr << result.error;
-                if (!result.error.empty()) hasOutput = true;
             }
             
-            if (hasOutput) {
+            if (printNewline) {
                 std::cout << "\n";
             }
             
