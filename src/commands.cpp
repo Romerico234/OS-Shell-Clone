@@ -780,7 +780,7 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
         }
 
         size_t lines = 0, words = 0, chars = 0;
-        char buf[4096];
+        char buffer[4096];
         bool inWord = false;
         ssize_t bytesRead;
         bool lastCharWasNewline = true;
