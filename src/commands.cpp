@@ -622,7 +622,7 @@ CommandResult Commands::quitCommand(const std::vector<std::string>& args) {
         return {1, "", "quit: this command takes no arguments"};
     }
 
-    std::cout << "Exiting Shell...\n";
+    std::cout << "[Process completed]\n";
     std::exit(0);
 }
 
@@ -633,12 +633,19 @@ CommandResult Commands::quitCommand(const std::vector<std::string>& args) {
  */
 CommandResult Commands::clrCommand(const std::vector<std::string>& args) {
     if (!args.empty()) {
-        return {1, "", "clr: this command takes no arguments"};
+        try 
+        {
+            std::regex re(args[0]);
+            return {0, "", ""};
+        } catch (const std::regex_error& e)
+        {
+            return {1, "", "clr: invalid rregex"};
+        }
     }
-
     std::cout << "\033[H\033[J";
     return {0, "", ""};
-}
+    }
+
 
 /**
  * @brief Displays the path of the directory the shell is currently in.
@@ -670,7 +677,7 @@ CommandResult Commands::environCommand(const std::vector<std::string>& args) {
 
     std::string out;
 
-    for (char **env = ::environ; *env != nullptr; env++) {
+    for (char **env = environ; *env != nullptr; env++) {
         out += std::string(*env) + "\n";
     }
 
@@ -727,6 +734,7 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
     bool countChars = false;
     std::vector<std::string> files;
 
+    // Parse flags and file names
     for (const std::string& arg : args) {
         if (arg == "-l") countLines = true;
         else if (arg == "-w") countWords = true;
@@ -734,6 +742,7 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
         else files.push_back(arg);
     }
 
+    // If no flags, count all
     if (!countLines && !countWords && !countChars) {
         countLines = countWords = countChars = true;
     }
@@ -745,8 +754,25 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
     std::string out;
     std::string err;
 
-    for (const std::string& filename : files)
-    {
+    auto isFileEmpty = [](const std::string& filename) -> bool {
+        struct stat st;
+        if (stat(filename.c_str(), &st) != 0) {
+            return false; 
+        }
+        return st.st_size == 0;
+    };
+
+    for (const std::string& filename : files) {
+        if (isFileEmpty(filename)) {
+            std::string zeroCount = "";
+            if (countLines) zeroCount += "0 ";
+            if (countWords) zeroCount += "0 ";
+            if (countChars) zeroCount += "0 ";
+            zeroCount += filename + "\n";
+            out += zeroCount;
+            continue;
+        }
+
         int fd = open(filename.c_str(), O_RDONLY);
         if (fd == -1) {
             err += "wc: cannot open file '" + filename + "': " + strerror(errno) + "\n";
@@ -757,13 +783,19 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
         char buf[4096];
         bool inWord = false;
         ssize_t bytesRead;
+        bool lastCharWasNewline = true;
 
-        while ((bytesRead = read(fd, buf, sizeof(buf))) > 0)
-        {
+        while ((bytesRead = read(fd, buf, sizeof(buf))) > 0) {
             for (ssize_t i = 0; i < bytesRead; ++i) {
                 char c = buf[i];
+                chars++;
 
-                if (c == '\n') lines++;
+                if (c == '\n') {
+                    lines++;
+                    lastCharWasNewline = true;
+                } else {
+                    lastCharWasNewline = false;
+                }
 
                 if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
                     inWord = false;
@@ -771,10 +803,10 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
                     words++;
                     inWord = true;
                 }
-
-                chars++;
             }
         }
+
+        if (!lastCharWasNewline) lines++;
 
         if (bytesRead == -1) {
             err += "wc: error reading file '" + filename + "': " + strerror(errno) + "\n";
@@ -788,8 +820,9 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
         out += filename + "\n";
     }
 
-    return {0, out, err};
+    return {err.empty() ? 0 : 1, out, err};
 }
+
 
 /**
  * @brief Creates a new directory at the specified path.
@@ -804,7 +837,7 @@ CommandResult Commands::mkdirCommand(const std::vector<std::string>& args) {
     std::string out, err;
 
     for (const std::string& dir : args) {
-        if (::mkdir(dir.c_str(), 0755) == -1) { 
+        if (mkdir(dir.c_str(), 0755) == -1) { 
             err += "mkdir: cannot create directory '" + dir + "': " + strerror(errno) + "\n";
         }
     }
@@ -824,12 +857,13 @@ CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
     }
 
     bool recursive = false;
-    bool force = false;
     size_t currentArg = 0;
 
+    // Parse flags (only -r supported)
     while (currentArg < args.size() && args[currentArg][0] == '-') {
         const std::string& flag = args[currentArg];
         if (flag.find('r') != std::string::npos) recursive = true;
+        else return {1, "", "rm: invalid option '" + flag + "'"};
         currentArg++;
         if (currentArg == args.size()) {
             return {1, "", "rm: missing operand after '" + flag + "'"};
@@ -844,9 +878,7 @@ CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
 
         struct stat st;
         if (stat(path.c_str(), &st) == -1) {
-            if (!force) {
-                err += "rm: cannot access '" + path + "': " + strerror(errno) + "\n";
-            }
+            err += "rm: cannot access '" + path + "': " + strerror(errno) + "\n";
             continue;
         }
 
@@ -854,9 +886,7 @@ CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
             if (recursive) {
                 DIR* dir = opendir(path.c_str());
                 if (!dir) {
-                    if (!force) {
-                        err += "rm: cannot open directory '" + path + "': " + strerror(errno) + "\n";
-                    }
+                    err += "rm: cannot open directory '" + path + "': " + strerror(errno) + "\n";
                     continue;
                 }
 
@@ -865,20 +895,18 @@ CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
                     std::string name = entry->d_name;
                     if (name == "." || name == "..") continue;
                     std::string subpath = path + "/" + name;
-                    rmCommand({recursive ? "-r" : "", force ? "-f" : "", subpath});
+                    rmCommand({recursive ? "-r" : "", subpath});
                 }
                 closedir(dir);
 
-                if (::rmdir(path.c_str()) == -1 && !force) {
+                if (::rmdir(path.c_str()) == -1) {
                     err += "rm: failed to remove directory '" + path + "': " + strerror(errno) + "\n";
                 }
             } else {
-                if (!force) err += "rm: '" + path + "' is a directory\n";
+                err += "rm: '" + path + "' is a directory\n";
             }
-        } 
-
-        else {
-            if (::unlink(path.c_str()) == -1 && !force) {
+        } else {
+            if (::unlink(path.c_str()) == -1) {
                 err += "rm: cannot remove '" + path + "': " + strerror(errno) + "\n";
             }
         }
@@ -886,6 +914,7 @@ CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
 
     return {err.empty() ? 0 : 1, out, err};
 }
+
 
 /**
  * @brief Move files or directories from one location to another.
