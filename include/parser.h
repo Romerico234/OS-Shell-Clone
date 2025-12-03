@@ -7,7 +7,7 @@
 /**
  * This project makes use of a Operator-Precednce Parser (uses precedence climbing which is specialized for infix expressions)
  * 
- * CFG:
+ * CFG (Conceptual Grammar, not actually implemented):
  * <START> ::= <COMMAND_LINE> <END_OF_INPUT>
  * <COMMAND_LINE> ::= <OP_EXPR>
  * <OP_EXPR> ::= <COMMAND_ATOM> <OP_TAIL>

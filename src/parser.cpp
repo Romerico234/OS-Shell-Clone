@@ -7,6 +7,8 @@ AST Parser::parse(const std::vector<Token>& tokens) {
     }
 
     int index = 0;
+    // <START> ::= <COMMAND_LINE> <END_OF_INPUT>
+    // END_OF_INPUT is implicitly handled by reaching tokens.size()
     AST tree = parseCmdLine(index, tokens);
     return tree;
 }
@@ -17,22 +19,21 @@ AST Parser::parseCmdLine(int& index, const std::vector<Token>& tokens) {
     return parseOpExpr(std::move(lhs), 0, index, tokens);
 }
 
-// <COMMAND_ATOM> ::= <ARG_LIST>
+// <COMMAND_ATOM> ::= <WORD_OR_QUOTED> <ARG_LIST>
+// <ARG_LIST> implemented via a loop until an operator is seen
 AST Parser::parseCmdAtomic(int& index, const std::vector<Token>& tokens) {
     int n = tokens.size();
     if (index >= n) {
         throw std::runtime_error("Unexpected end of input in command atom");
     }
 
+    // First element is the command name
     std::string cmd = tokens[index].lexeme;
     ++index;
 
+    // Then collect arguments until we hit an operator
     std::vector<std::string> args;
-
-    while (index < n) {
-        if (isOperator(tokens[index])) {
-            break;
-        }
+    while (index < n && !isOperator(tokens[index])) {
         args.push_back(tokens[index].lexeme);
         ++index;
     }
@@ -40,7 +41,15 @@ AST Parser::parseCmdAtomic(int& index, const std::vector<Token>& tokens) {
     return AST::makeCommandNode(std::move(cmd), std::move(args));
 }
 
-// <OP_EXPR> ::= <lhs> OP <rhs> OP_TAIL (using precedence climbing)
+/**
+ * <OP_EXPR> ::= <COMMAND_ATOM> <OP_TAIL>
+ *
+ * <OP_TAIL> ::= <OPERATOR> <COMMAND_ATOM> <OP_TAIL> | ε
+ *
+ * Implemented via Precedence Climbing Method:
+ *    - If next operator has higher precedence, recursively parse its RHS first
+ *    - Otherwise return to the caller
+ */
 AST Parser::parseOpExpr(AST lhs, int min_prec, int& index, const std::vector<Token>& tokens) {
     int n = tokens.size();
 
@@ -60,10 +69,8 @@ AST Parser::parseOpExpr(AST lhs, int min_prec, int& index, const std::vector<Tok
         ++index;
         AST rhs = parseCmdAtomic(index, tokens);
 
-        while (index < n) {
-            if (!isOperator(tokens[index])) {
-                break;
-            }
+        // Handle higher-precedence operators on the RHS
+        while (index < n && isOperator(tokens[index])) {
 
             std::string next = tokens[index].lexeme;
             int next_prec = precedence(next);
