@@ -11,6 +11,11 @@
 #include <unistd.h>
 
 int main() {
+    const char* home = getenv("HOME");
+    if (home != nullptr) {
+        chdir(home);
+    }
+
     std::cout << "|  Welcome to our Custom Shell!\n";
     std::cout << "|  Type help for our list of commands!\n";
 
