@@ -79,77 +79,92 @@ CommandResult Commands::pauseCommand(const std::vector<std::string> &args)
 }
 
 /**
- * @brief List the contents of the current working directory
- * @param args Optional flags:
+ * @brief List the contents of files and directories
+ * @param args Optional flags or file/directory paths:
  *        - "-a" include hidden entries
  *        - "-A" exclude "." and ".."
- *        - "-l" include detailed file information (permissions, access rights)
- * @return Status code, directory listing output, and possible error messages
+ *        - "-l" include detailed file information
+ *        - otherwise, treat as file/directory operand
+ * @return Status code, output, and possible error messages
  */
 CommandResult Commands::lsCommand(const std::vector<std::string>& args) {
     bool showAll = false;
-    bool almostAll = false; 
-    bool longList = false; 
+    bool almostAll = false;
+    bool longList = false;
 
+    std::vector<std::string> paths;
     std::string out;
-    std::string err;
 
     for (const std::string& arg : args) {
         if (arg == "-a") showAll = true;
         else if (arg == "-A") almostAll = true;
         else if (arg == "-l") longList = true;
-        else return {1, "", "invalid flag -- '" + arg};
+        else if (arg.size() > 1 && arg[0] == '-') {
+            return {1, "", "ls: invalid flag -- '" + arg + "'"};
+        } else {
+            paths.push_back(arg);
+        }
     }
 
-    char cwd[FILENAME_MAX];
-    if (!getcwd(cwd, FILENAME_MAX)) {
-        return {1, "", "failed to get current directory"};
+    if (paths.empty()) {
+        paths.push_back(".");
     }
 
-    DIR* dirp = opendir(cwd);
-    if (!dirp) {
-        return {1, "", "cannot open directory: " + std::string(strerror(errno))};
-    }
-
-    struct dirent* dp;
-
-    while ((dp = readdir(dirp)) != nullptr) {
-        std::string name = dp->d_name;
-
-        if (!showAll && !almostAll && name[0] == '.') continue;
-
-        if (almostAll && (name == "." || name == "..")) continue;
-
-        if (longList) {
-            struct stat info;
-            if (stat(name.c_str(), &info) == -1) {
-                err += "cannot access " + name + ": " + strerror(errno);
-                continue;
-            }
-
-            char type = S_ISDIR(info.st_mode) ? 'd' : '-';
-
-            out += type;
-            out += ((info.st_mode & S_IRUSR) ? 'r' : '-');
-            out += ((info.st_mode & S_IWUSR) ? 'w' : '-');
-            out += ((info.st_mode & S_IXUSR) ? 'x' : '-');
-            out += ((info.st_mode & S_IRGRP) ? 'r' : '-');
-            out += ((info.st_mode & S_IWGRP) ? 'w' : '-');
-            out += ((info.st_mode & S_IXGRP) ? 'x' : '-');
-            out += ((info.st_mode & S_IROTH) ? 'r' : '-');
-            out += ((info.st_mode & S_IWOTH) ? 'w' : '-');
-            out += ((info.st_mode & S_IXOTH) ? 'x' : '-');
-            out += " " + std::to_string(info.st_size);
-            out += " " + name + "\n";
-
+    for (const std::string& p : paths) {
+        struct stat info;
+        if (stat(p.c_str(), &info) == -1) {
+            return {1, "", "ls: cannot access '" + p + "': " + std::string(strerror(errno))};
+        }
+        
+        // If path is a file
+        if (!S_ISDIR(info.st_mode)) {
+            if (longList) {
+                out += formatLsLongListing(p, info);
+            } else {
+                out += p + "\n";
+            } 
             continue;
         }
 
-        out += name + " ";
+        if (paths.size() > 1) {
+            out += p + ":\n";
+        }
+
+        DIR* dirp = opendir(p.c_str());
+        if (!dirp) {
+            return {1, "", "ls: cannot open directory '" + p + "': " + std::string(strerror(errno))};
+        }
+
+        struct dirent* dp;
+        while ((dp = readdir(dirp)) != nullptr) {
+            std::string name = dp->d_name;
+
+            if (!showAll && !almostAll && name[0] == '.') {
+                continue;
+            }
+            
+            if (almostAll && (name == "." || name == "..")) {
+                continue;
+            }
+
+            std::string full = p + "/" + name;
+
+            if (longList) {
+                struct stat finfo;
+                if (stat(full.c_str(), &finfo) == -1) {
+                    closedir(dirp);
+                    return {1, "", "ls: cannot access '" + name + "': " + std::string(strerror(errno))};
+                }
+                out += formatLsLongListing(name, finfo);
+            } else {
+                out += name + " ";
+            }
+        }
+
+        closedir(dirp);
     }
 
-    closedir(dirp);
-    return {0, stripTrailingNewline(out), err};
+    return {0, stripTrailingNewline(out), ""};
 }
 
 /**
@@ -318,7 +333,7 @@ CommandResult Commands::cpCommand(const std::vector<std::string>& args) {
         return {1, "", "cp: target '" + dest + "' is not a directory"};
     }
 
-    for (int i = 0; i < numSources; i++) {
+    for (int i = 0; i < numSources; ++i) {
         std::string src = args[i];
 
         // Rejecting directory sources because no -r support yet
@@ -391,7 +406,7 @@ CommandResult Commands::chownCommand(const std::vector<std::string>& args) {
     }
     uid_t newOwner = pw->pw_uid;
 
-    for (int i = 1; i < args.size(); i++) {
+    for (int i = 1; i < args.size(); ++i) {
         const std::string& file = args[i];
 
         struct stat st;
@@ -459,7 +474,7 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
         }
         else break;
 
-        idx++;
+        ++idx;
     }
 
     if (idx >= args.size()) {
@@ -493,7 +508,7 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
     int totalMatches = 0;
     std::string out;
 
-    for (int i = idx; i < args.size(); i++) {
+    for (int i = idx; i < args.size(); ++i) {
 
         const std::string& file = args[i];
 
@@ -523,7 +538,7 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
                 }
 
                 if (matched) {
-                    totalMatches++;
+                    ++totalMatches;
 
                     if (opt_m != -1 && totalMatches > opt_m) {
                         close(fd);
@@ -551,7 +566,7 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
                     }
                 }
 
-                lineNumber++;
+                ++lineNumber;
             }
         }
 
@@ -565,7 +580,7 @@ CommandResult Commands::grepCommand(const std::vector<std::string>& args) {
             }
 
             if (matched) {
-                totalMatches++;
+                ++totalMatches;
                 if (opt_m != -1 && totalMatches > opt_m) {
                     close(fd);
                     if (opt_c) {
@@ -666,7 +681,7 @@ CommandResult Commands::environCommand(const std::vector<std::string>& args) {
 
     std::string out;
 
-    for (char **env = environ; *env != nullptr; env++) {
+    for (char **env = environ; *env != nullptr; ++env) {
         out += std::string(*env) + "\n";
     }
 
@@ -741,15 +756,8 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
 
     std::string out;
 
-    auto isFileEmpty = [](const std::string& filename) -> bool {
-        struct stat st;
-        if (stat(filename.c_str(), &st) != 0) {
-            return false; 
-        }
-        return st.st_size == 0;
-    };
-
     for (const std::string& filename : files) {
+
         if (isFileEmpty(filename)) {
             std::string zeroCount = "";
             if (countLines) zeroCount += "0 ";
@@ -766,18 +774,18 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
         }
 
         size_t lines = 0, words = 0, chars = 0;
-        char buf[4096];
+        char buffer[4096];
         bool inWord = false;
         ssize_t bytesRead;
         bool lastCharWasNewline = true;
 
-        while ((bytesRead = read(fd, buf, sizeof(buf))) > 0) {
-            for (ssize_t i = 0; i < bytesRead; ++i) {
-                char c = buf[i];
-                chars++;
+        while ((bytesRead = read(fd, buffer, sizeof(buffer))) > 0) {
+            for (int i = 0; i < bytesRead; ++i) {
+                char c = buffer[i];
+                ++chars;
 
                 if (c == '\n') {
-                    lines++;
+                    ++lines;
                     lastCharWasNewline = true;
                 } else {
                     lastCharWasNewline = false;
@@ -786,15 +794,18 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
                 if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
                     inWord = false;
                 } else if (!inWord) {
-                    words++;
+                    ++words;
                     inWord = true;
                 }
             }
         }
 
-        if (!lastCharWasNewline) lines++;
+        if (!lastCharWasNewline) {
+            ++lines;
+        }
 
         if (bytesRead == -1) {
+            close(fd);
             return {1, "", "wc: error reading file '" + filename + "': " + strerror(errno)};
         }
 
@@ -808,7 +819,6 @@ CommandResult Commands::wcCommand(const std::vector<std::string>& args) {
 
     return {0, stripTrailingNewline(out), ""};
 }
-
 
 /**
  * @brief Creates a new directory at the specified path.
@@ -853,7 +863,7 @@ CommandResult Commands::rmCommand(const std::vector<std::string>& args) {
             return {1, "", "rm: invalid option '" + flag + "'"};
         }
         
-        currentArg++;
+        ++currentArg;
         if (currentArg == args.size()) {
             return {1, "", "rm: missing operand after '" + flag + "'"};
         }
@@ -927,10 +937,45 @@ CommandResult Commands::mvCommand(const std::vector<std::string>& args) {
     }
 
     /**
-     * TODO: rename() fails with EXDEV ("Invalid cross-device link") when the source 
-     * and destination are on different filesystems (like on Docker bind mounts).
+     * rename() fails with EXDEV ("Invalid cross-device link") when the source 
+     * and destination are on different filesystems (like on Docker bind mounts and volumes).
+     * In this case, the correct fallback behavior is:
+    *    1. Copy the source file to the destination path, and
+    *    2. Remove the original file
     */
     if (std::rename(src.c_str(), dest.c_str()) != 0) {
+        if (errno == EXDEV) {
+            int in = open(src.c_str(), O_RDONLY);
+            if (in == -1) {
+                return {1, "", "mv: cannot open source file '" + src + "'"};
+            }
+
+            int out = open(dest.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (out == -1) {
+                close(in);
+                return {1, "", "mv: cannot create destination file '" + dest + "'"};
+            }
+
+            char buffer[4096];
+            ssize_t bytesRead;
+            while ((bytesRead = read(in, buffer, sizeof(buffer))) > 0) {
+                if (write(out, buffer, bytesRead) != bytesRead) {
+                    close(in);
+                    close(out);
+                    return {1, "", "mv: write error while copying to '" + dest + "'"};
+                }
+            }
+
+            close(in);
+            close(out);
+
+            if (unlink(src.c_str()) != 0) {
+                return {1, "", "mv: copied but failed to remove original '" + src + "'"};
+            }
+
+            return {0, "", ""};
+        }
+
         return {1, "", "mv: failed to move '" + src + "' to '" + dest + "': " + strerror(errno)};
     }
 
@@ -967,6 +1012,28 @@ CommandResult Commands::chmodCommand(const std::vector<std::string>& args) {
 }
 
 /* --- Helper Functions --- */
+std::string Commands::formatLsLongListing(const std::string& name, const struct stat& info) {
+    std::string out;
+
+    char type = S_ISDIR(info.st_mode) ? 'd' : '-';
+    out += type;
+
+    out += ((info.st_mode & S_IRUSR) ? 'r' : '-');
+    out += ((info.st_mode & S_IWUSR) ? 'w' : '-');
+    out += ((info.st_mode & S_IXUSR) ? 'x' : '-');
+    out += ((info.st_mode & S_IRGRP) ? 'r' : '-');
+    out += ((info.st_mode & S_IWGRP) ? 'w' : '-');
+    out += ((info.st_mode & S_IXGRP) ? 'x' : '-');
+    out += ((info.st_mode & S_IROTH) ? 'r' : '-');
+    out += ((info.st_mode & S_IWOTH) ? 'w' : '-');
+    out += ((info.st_mode & S_IXOTH) ? 'x' : '-');
+
+    out += " " + std::to_string(info.st_size);
+    out += " " + name + "\n";
+
+    return out;
+}
+
 std::string Commands::formatRmdirErrorMsg(const std::string& path) {
     switch (errno) {
         case ENOTEMPTY:
@@ -1009,4 +1076,12 @@ std::string Commands::stripTrailingNewline(const std::string& s) {
         return s.substr(0, s.size() - 1);
     }
     return s;
+}
+
+bool Commands::isFileEmpty(const std::string& filename) {
+    struct stat st;
+    if (stat(filename.c_str(), &st) != 0) {
+        return false;
+    }
+    return st.st_size == 0;
 }

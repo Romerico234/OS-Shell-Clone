@@ -17,7 +17,7 @@ int main() {
     while (true) {
         char cwd[PATH_MAX];
         getcwd(cwd, sizeof(cwd));
-        std::cout << cwd << "/custom-shell> ";
+        std::cout << "custom-shell:" << cwd << "# ";
 
         std::string input;
         std::getline(std::cin, input);
