@@ -26,6 +26,12 @@ AST Parser::parseCmdAtomic(int& index, const std::vector<Token>& tokens) {
     if (index >= n) {
         throw std::runtime_error("Unexpected end of input in command atom");
     }
+    
+    if (isOperator(tokens[index])) {
+        throw std::runtime_error(
+            "Expected command, found operator '" + tokens[index].lexeme + "'"
+        );
+    }
 
     // First element is the command name
     std::string cmd = tokens[index].lexeme;
