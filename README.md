@@ -1,4 +1,4 @@
-# OS-Shell-Clone
+# Unix-Shell-Clone
 
 This project implements a simplified Unix command-line shell. It includes:
 - A modular architecture (based on the REPL) with distinct components:
