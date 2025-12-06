@@ -37,7 +37,7 @@ CommandResult Commands::helpCommand(const std::vector<std::string>& args) {
         "  pwd                                      Print working directory.\n"
         "  cat <file>...                            Print file contents.\n"
         "  mkdir <dir>                              Create directory.\n"
-        "  rmdir <dir>                              Remove directory.\n"
+        "  rmdir [-p] <dir>                         Remove directory.\n"
         "  rm [-r] <path>                           Remove file or directory.\n"
         "  cp <src>... <dst>                        Copy.\n"
         "  mv <src> <dst>                           Move.\n"
